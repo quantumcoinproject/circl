@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/internal/sha3"
 )
 
 func writeHex(w io.Writer, prefix string, val interface{}) {

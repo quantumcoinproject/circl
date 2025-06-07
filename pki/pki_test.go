@@ -3,8 +3,8 @@ package pki_test
 import (
 	"testing"
 
-	"github.com/cloudflare/circl/pki"
-	"github.com/cloudflare/circl/sign/schemes"
+	"github.com/quantumcoinproject/circl/pki"
+	"github.com/quantumcoinproject/circl/sign/schemes"
 )
 
 func TestPEM(t *testing.T) {

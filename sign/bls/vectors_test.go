@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/test"
-	"github.com/cloudflare/circl/sign/bls"
+	"github.com/quantumcoinproject/circl/internal/test"
+	"github.com/quantumcoinproject/circl/sign/bls"
 )
 
 func TestVectors(t *testing.T) {

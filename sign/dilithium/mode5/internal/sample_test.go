@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	common "github.com/cloudflare/circl/sign/internal/dilithium"
+	common "github.com/quantumcoinproject/circl/sign/internal/dilithium"
 )
 
 func TestVectorDeriveUniform(t *testing.T) {

@@ -7,10 +7,10 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/sign"
-	"github.com/cloudflare/circl/sign/dilithium/mode3"
-	"github.com/cloudflare/circl/sign/ed448"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/sign"
+	"github.com/quantumcoinproject/circl/sign/dilithium/mode3"
+	"github.com/quantumcoinproject/circl/sign/ed448"
 )
 
 const (

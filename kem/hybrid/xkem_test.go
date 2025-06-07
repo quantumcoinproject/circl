@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/cloudflare/circl/kem"
+	"github.com/quantumcoinproject/circl/kem"
 )
 
 func mustDecodeString(s string) []byte {

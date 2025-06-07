@@ -6,10 +6,10 @@ import (
 	"io"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/internal/test"
-	"github.com/cloudflare/circl/sign/slhdsa"
-	"github.com/cloudflare/circl/xof"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/internal/test"
+	"github.com/quantumcoinproject/circl/sign/slhdsa"
+	"github.com/quantumcoinproject/circl/xof"
 )
 
 var fastSign = [...]slhdsa.ID{

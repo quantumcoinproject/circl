@@ -20,9 +20,9 @@ import (
 	"crypto/subtle"
 	"io"
 
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/kem"
-	cpapke "github.com/cloudflare/circl/pke/kyber/{{.PkePkg}}"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/kem"
+	cpapke "github.com/quantumcoinproject/circl/pke/kyber/{{.PkePkg}}"
 	cryptoRand "crypto/rand"
 )
 

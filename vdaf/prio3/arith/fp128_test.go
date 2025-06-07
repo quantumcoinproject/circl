@@ -5,7 +5,7 @@ package arith
 import (
 	"testing"
 
-	"github.com/cloudflare/circl/vdaf/prio3/arith/fp128"
+	"github.com/quantumcoinproject/circl/vdaf/prio3/arith/fp128"
 )
 
 func TestFp128(t *testing.T) {

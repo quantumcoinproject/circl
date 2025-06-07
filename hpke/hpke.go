@@ -19,7 +19,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudflare/circl/kem"
+	"github.com/quantumcoinproject/circl/kem"
 )
 
 const versionLabel = "HPKE-v1"

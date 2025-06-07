@@ -4,8 +4,8 @@ package flp
 import (
 	"errors"
 
-	"github.com/cloudflare/circl/vdaf/prio3/arith"
-	"github.com/cloudflare/circl/vdaf/prio3/internal/cursor"
+	"github.com/quantumcoinproject/circl/vdaf/prio3/arith"
+	"github.com/quantumcoinproject/circl/vdaf/prio3/internal/cursor"
 )
 
 // FLP is an instance of a FLP by Boneh et al. Crypto, 2019 paper

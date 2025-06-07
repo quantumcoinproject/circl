@@ -3,7 +3,7 @@ package internal
 import (
 	"testing"
 
-	common "github.com/cloudflare/circl/sign/internal/dilithium"
+	common "github.com/quantumcoinproject/circl/sign/internal/dilithium"
 )
 
 // Tests specific to the current mode

@@ -3,7 +3,7 @@ package ff
 import (
 	"testing"
 
-	"github.com/cloudflare/circl/internal/test"
+	"github.com/quantumcoinproject/circl/internal/test"
 )
 
 func randomURoot(t testing.TB) *URoot {

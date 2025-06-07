@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudflare/circl/group"
-	"github.com/cloudflare/circl/internal/test"
-	"github.com/cloudflare/circl/zk/dleq"
+	"github.com/quantumcoinproject/circl/group"
+	"github.com/quantumcoinproject/circl/internal/test"
+	"github.com/quantumcoinproject/circl/zk/dleq"
 )
 
 type vector struct {

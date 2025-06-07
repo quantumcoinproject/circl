@@ -49,7 +49,7 @@ linters-settings:
           - $gostd
           - golang.org/x
           - github.com/bwesterb/go-ristretto
-          - github.com/cloudflare/circl
+          - github.com/quantumcoinproject/circl
   funlen:
     lines: 120
     statements: 80

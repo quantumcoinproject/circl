@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudflare/circl/dh/sidh/internal/common"
-	. "github.com/cloudflare/circl/internal/test"
+	"github.com/quantumcoinproject/circl/dh/sidh/internal/common"
+	. "github.com/quantumcoinproject/circl/internal/test"
 )
 
 type sikeVec struct {

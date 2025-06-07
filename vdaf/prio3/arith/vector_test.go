@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/internal/test"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/internal/test"
 )
 
 func testVec[V Vec[V, E], E EltTest, F Fp[E]](t *testing.T) {

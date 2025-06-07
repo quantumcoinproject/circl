@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/asn1"
 
-	"github.com/cloudflare/circl/sign"
+	"github.com/quantumcoinproject/circl/sign"
 )
 
 var sch sign.Scheme = &scheme{}

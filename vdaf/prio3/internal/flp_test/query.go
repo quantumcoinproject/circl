@@ -4,11 +4,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/internal/test"
-	"github.com/cloudflare/circl/math"
-	"github.com/cloudflare/circl/vdaf/prio3/arith"
-	"github.com/cloudflare/circl/vdaf/prio3/internal/flp"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/internal/test"
+	"github.com/quantumcoinproject/circl/math"
+	"github.com/quantumcoinproject/circl/vdaf/prio3/arith"
+	"github.com/quantumcoinproject/circl/vdaf/prio3/internal/flp"
 )
 
 func TestInvalidQuery[

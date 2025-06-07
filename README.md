@@ -2,10 +2,10 @@
 
 # CIRCL
 
-[![GitHub release](https://img.shields.io/github/release/cloudflare/circl.svg)](https://GitHub.com/cloudflare/circl/releases/)
-[![CIRCL](https://github.com/cloudflare/circl/workflows/CIRCL/badge.svg)](https://github.com/cloudflare/circl/actions)
-[![GoDoc](https://godoc.org/github.com/cloudflare/circl?status.svg)](https://pkg.go.dev/github.com/cloudflare/circl?tab=overview)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cloudflare/circl)](https://goreportcard.com/report/github.com/cloudflare/circl)
+[![GitHub release](https://img.shields.io/github/release/cloudflare/circl.svg)](https://github.com/quantumcoinproject/circl/releases/)
+[![CIRCL](https://github.com/quantumcoinproject/circl/workflows/CIRCL/badge.svg)](https://github.com/quantumcoinproject/circl/actions)
+[![GoDoc](https://godoc.org/github.com/quantumcoinproject/circl?status.svg)](https://pkg.go.dev/github.com/quantumcoinproject/circl?tab=overview)
+[![Go Report Card](https://goreportcard.com/badge/github.com/quantumcoinproject/circl)](https://goreportcard.com/report/github.com/quantumcoinproject/circl)
 [![codecov](https://codecov.io/gh/cloudflare/circl/branch/main/graph/badge.svg)](https://codecov.io/gh/cloudflare/circl)
 
 **CIRCL** (Cloudflare Interoperable, Reusable Cryptographic Library) is a collection
@@ -15,17 +15,17 @@ Curve Cryptography (ECC).
 
 ## Security Disclaimer
 
-🚨 This library is offered as-is, and without a guarantee. Therefore, it is expected that changes in the code, repository, and API occur in the future. We recommend to take caution before using this library in a production application since part of its content is experimental. All security issues must be reported, please notify us immediately following the instructions given in our [Security Policy](https://github.com/cloudflare/circl/security/policy).
+🚨 This library is offered as-is, and without a guarantee. Therefore, it is expected that changes in the code, repository, and API occur in the future. We recommend to take caution before using this library in a production application since part of its content is experimental. All security issues must be reported, please notify us immediately following the instructions given in our [Security Policy](https://github.com/quantumcoinproject/circl/security/policy).
 
 ## Installation
 
 You can get CIRCL by fetching:
 
 ```sh
-go get -u github.com/cloudflare/circl
+go get -u github.com/quantumcoinproject/circl
 ```
 
-Alternatively, look at the [Cloudflare Go](https://github.com/cloudflare/go/tree/cf) fork to see how to integrate CIRCL natively in Go.
+Alternatively, look at the [Cloudflare Go](https://github.com/quantumcoinproject/go/tree/cf) fork to see how to integrate CIRCL natively in Go.
 
 ## List of Algorithms
 
@@ -167,7 +167,7 @@ APA Style
 ```
 Faz-Hernandez, A. and Kwiatkowski, K. (2019). Introducing CIRCL:
 An Advanced Cryptographic Library. Cloudflare. Available at
-https://github.com/cloudflare/circl. v1.6.1 Accessed Apr, 2025.
+https://github.com/quantumcoinproject/circl. v1.6.1 Accessed Apr, 2025.
 ```
 
 BibTeX Source
@@ -182,7 +182,7 @@ BibTeX Source
                    of this library is to be used as a tool for experimental
                    deployment of cryptographic algorithms targeting Post-Quantum (PQ)
                    and Elliptic Curve Cryptography (ECC).}},
-  note         = {Available at \url{https://github.com/cloudflare/circl}. v1.6.1 Accessed Apr, 2025},
+  note         = {Available at \url{https://github.com/quantumcoinproject/circl}. v1.6.1 Accessed Apr, 2025},
   month        = jun,
   year         = {2019}
 }

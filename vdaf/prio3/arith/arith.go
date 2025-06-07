@@ -8,8 +8,8 @@ import (
 	"encoding"
 	"io"
 
-	"github.com/cloudflare/circl/internal/conv"
-	"github.com/cloudflare/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/internal/conv"
+	"github.com/quantumcoinproject/circl/internal/sha3"
 	"golang.org/x/crypto/cryptobyte"
 )
 

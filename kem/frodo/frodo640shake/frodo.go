@@ -7,8 +7,8 @@ import (
 	"crypto/subtle"
 	"io"
 
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/kem"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/kem"
 )
 
 const (

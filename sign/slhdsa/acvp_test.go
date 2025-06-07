@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/test"
-	"github.com/cloudflare/circl/xof"
+	"github.com/quantumcoinproject/circl/internal/test"
+	"github.com/quantumcoinproject/circl/xof"
 )
 
 type acvpKeyGenPrompt struct {

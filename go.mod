@@ -1,4 +1,4 @@
-module github.com/cloudflare/circl
+module github.com/quantumcoinproject/circl
 
 go 1.22.0
 

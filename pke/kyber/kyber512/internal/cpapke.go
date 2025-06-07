@@ -3,9 +3,9 @@ package internal
 import (
 	"bytes"
 
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/kem"
-	"github.com/cloudflare/circl/pke/kyber/internal/common"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/kem"
+	"github.com/quantumcoinproject/circl/pke/kyber/internal/common"
 )
 
 // A Kyber.CPAPKE private key.
