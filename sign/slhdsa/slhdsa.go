@@ -62,6 +62,10 @@ func SignDeterministic(
 	return priv.doSign(message, context, priv.publicKey.seed)
 }
 
+func SignDeterministicNoContext(priv *PrivateKey, message []byte) (signature []byte, err error) {
+	return priv.doSignNoContext(message, priv.publicKey.seed)
+}
+
 // [SignRandomized] returns a random signature of the message with the
 // specified context.
 // It returns an error if it fails reading from the random source.
@@ -75,6 +79,18 @@ func SignRandomized(
 	}
 
 	return priv.doSign(message, context, addRand)
+}
+
+func SignRandomizedNoContext(
+	priv *PrivateKey, random io.Reader, message []byte,
+) (signature []byte, err error) {
+	prm := priv.ID.params()
+	addRand, err := readRandom(random, prm.n)
+	if err != nil {
+		return nil, err
+	}
+
+	return priv.doSignNoContext(message, addRand)
 }
 
 // [PrivateKey.Sign] returns a randomized signature of the message with an
@@ -99,6 +115,12 @@ func (k *PrivateKey) doSign(
 	return slhSignInternal(k, msgPrime, addRand)
 }
 
+func (k *PrivateKey) doSignNoContext(
+	message []byte, addRand []byte,
+) ([]byte, error) {
+	return slhSignInternal(k, message, addRand)
+}
+
 // [Verify] returns true if the signature of the message with the specified
 // context is valid.
 func Verify(key *PublicKey, message *Message, signature, context []byte) bool {
@@ -109,6 +131,10 @@ func Verify(key *PublicKey, message *Message, signature, context []byte) bool {
 	}
 
 	return slhVerifyInternal(key, msgPrime, signature)
+}
+
+func VerifyNoContext(pk *PublicKey, msg, sig []byte) bool {
+	return slhVerifyInternal(pk, msg, sig)
 }
 
 func readRandom(random io.Reader, size uint32) (out []byte, err error) {
