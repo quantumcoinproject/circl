@@ -137,6 +137,10 @@ func VerifyNoContext(pk *PublicKey, msg, sig []byte) bool {
 	return slhVerifyInternal(pk, msg, sig)
 }
 
+func IsDeterministicSignature(pub *PublicKey, sigBytes []byte) (bool, error) {
+	return isDeterministicSignature(pub, sigBytes)
+}
+
 func readRandom(random io.Reader, size uint32) (out []byte, err error) {
 	out = make([]byte, size)
 	if random == nil {
