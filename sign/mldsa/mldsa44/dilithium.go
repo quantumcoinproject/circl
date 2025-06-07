@@ -97,7 +97,7 @@ func (sk *PrivateKey) unsafeSignInternal(msg []byte, rnd [32]byte) []byte {
 	return ret[:]
 }
 
-func (sk *PrivateKey)SignNoContext(msg []byte, rnd [32]byte) []byte {
+func (sk *PrivateKey) SignNoContext(msg []byte, rnd [32]byte) []byte {
 	var ret [SignatureSize]byte
 	internal.SignTo(
 		(*internal.PrivateKey)(sk),
@@ -109,7 +109,6 @@ func (sk *PrivateKey)SignNoContext(msg []byte, rnd [32]byte) []byte {
 	)
 	return ret[:]
 }
-
 
 // Do not use. Implements ML-DSA.Verify_internal used for compatibility tests.
 func unsafeVerifyInternal(pk *PublicKey, msg, sig []byte) bool {
