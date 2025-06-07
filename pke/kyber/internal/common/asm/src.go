@@ -9,7 +9,7 @@ import (
 	. "github.com/mmcloughlin/avo/operand" // nolint:golint,stylecheck
 	. "github.com/mmcloughlin/avo/reg"     // nolint:golint,stylecheck
 
-	"github.com/cloudflare/circl/pke/kyber/internal/common/params"
+	"github.com/quantumcoinproject/circl/pke/kyber/internal/common/params"
 )
 
 // XXX align Poly on 16 bytes such that we can use aligned moves
@@ -108,10 +108,10 @@ func subAVX2() {
 //
 // For instance, if i=2, then this will swap
 //
-//   a[0b0100] ↔ b[0b0000]    a[0b0101] ↔ b[0b0001]
-//   a[0b0110] ↔ b[0b0010]    a[0b0111] ↔ b[0b0011]
-//   a[0b1100] ↔ b[0b1000]    a[0b1101] ↔ b[0b1001]
-//   a[0b1110] ↔ b[0b1010]    a[0b1111] ↔ b[0b1011]
+//	a[0b0100] ↔ b[0b0000]    a[0b0101] ↔ b[0b0001]
+//	a[0b0110] ↔ b[0b0010]    a[0b0111] ↔ b[0b0011]
+//	a[0b1100] ↔ b[0b1000]    a[0b1101] ↔ b[0b1001]
+//	a[0b1110] ↔ b[0b1010]    a[0b1111] ↔ b[0b1011]
 //
 // and keep all other lanes in their place.  If we index the lanes of a and
 // b consecutively (i.e. 0wxyz is wxyz of a and 1wxyz = wxyz of b), then
@@ -123,11 +123,11 @@ func subAVX2() {
 // Recall, namely, that on the fifth layer of the NTT we're computing
 // butterflies between indices
 //
-//      abcd0fgh  abcd1fgh
+//	abcd0fgh  abcd1fgh
 //
 // Applying bitflip with i=3 beforehand, the butterflies become
 //
-//      abc0dfgh  abc1dfgh
+//	abc0dfgh  abc1dfgh
 //
 // which allows for 16 consecutive butterflies, which is convenient for AVX2.
 // What we'll actually end up doing is a bit different: we'll apply both
@@ -177,7 +177,7 @@ func invNttAVX2() {
 
 	// A diagram of the order of the butterflies and swaps can be found here:
 	//
-	//  https://github.com/cloudflare/circl/wiki/images/kyber-invntt-avx2.svg
+	//  https://github.com/quantumcoinproject/circl/wiki/images/kyber-invntt-avx2.svg
 	//
 	// The vertical lines with circles on the end represent butterflies.
 	// The number in those butterflies refers to the index into the Zetas
@@ -501,7 +501,7 @@ func nttAVX2() {
 
 	// A diagram of the order of butterflies and swaps can be found here:
 	//
-	//  https://github.com/cloudflare/circl/wiki/images/kyber-ntt-avx2.svg
+	//  https://github.com/quantumcoinproject/circl/wiki/images/kyber-ntt-avx2.svg
 	//
 	// The vertical lines with circles on the end represent butterflies.
 	// The number in those butterflies refers to the index into the Zetas

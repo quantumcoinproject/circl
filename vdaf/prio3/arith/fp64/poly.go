@@ -2,7 +2,7 @@
 
 package fp64
 
-import "github.com/cloudflare/circl/math"
+import "github.com/quantumcoinproject/circl/math"
 
 type Poly []Fp
 

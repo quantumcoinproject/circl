@@ -9,7 +9,7 @@ import (
 	. "github.com/mmcloughlin/avo/operand" // nolint:golint,stylecheck
 	. "github.com/mmcloughlin/avo/reg"     // nolint:golint,stylecheck
 
-	"github.com/cloudflare/circl/sign/internal/dilithium/params"
+	"github.com/quantumcoinproject/circl/sign/internal/dilithium/params"
 )
 
 // XXX align Poly on 16 bytes such that we can use aligned moves
@@ -619,7 +619,8 @@ func invNttAVX2() {
 }
 
 // XXX Split out into separate file.  To do this we need to figure out how
-//     to share code properly between avo modules.
+//
+//	to share code properly between avo modules.
 func mulHatAVX2() {
 	TEXT("mulHatAVX2", NOSPLIT, "func(p, a, b *[256]uint32)")
 	Pragma("noescape")

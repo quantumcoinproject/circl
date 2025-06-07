@@ -11,9 +11,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/conv"
-	"github.com/cloudflare/circl/internal/test"
-	"github.com/cloudflare/circl/vdaf/prio3/internal/prio3"
+	"github.com/quantumcoinproject/circl/internal/conv"
+	"github.com/quantumcoinproject/circl/internal/test"
+	"github.com/quantumcoinproject/circl/vdaf/prio3/internal/prio3"
 	"golang.org/x/crypto/cryptobyte"
 )
 

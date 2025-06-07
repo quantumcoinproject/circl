@@ -10,9 +10,9 @@ import (
 	"io"
 
 	cryptoRand "crypto/rand"
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/kem"
-	cpapke "github.com/cloudflare/circl/pke/kyber/kyber1024"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/kem"
+	cpapke "github.com/quantumcoinproject/circl/pke/kyber/kyber1024"
 )
 
 const (

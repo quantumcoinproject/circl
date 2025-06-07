@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/conv"
-	"github.com/cloudflare/circl/internal/test"
+	"github.com/quantumcoinproject/circl/internal/conv"
+	"github.com/quantumcoinproject/circl/internal/test"
 )
 
 type (

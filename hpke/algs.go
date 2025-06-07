@@ -11,11 +11,11 @@ import (
 	"hash"
 	"io"
 
-	"github.com/cloudflare/circl/dh/x25519"
-	"github.com/cloudflare/circl/dh/x448"
-	"github.com/cloudflare/circl/kem"
-	"github.com/cloudflare/circl/kem/kyber/kyber768"
-	"github.com/cloudflare/circl/kem/xwing"
+	"github.com/quantumcoinproject/circl/dh/x25519"
+	"github.com/quantumcoinproject/circl/dh/x448"
+	"github.com/quantumcoinproject/circl/kem"
+	"github.com/quantumcoinproject/circl/kem/kyber/kyber768"
+	"github.com/quantumcoinproject/circl/kem/xwing"
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/hkdf"
 )

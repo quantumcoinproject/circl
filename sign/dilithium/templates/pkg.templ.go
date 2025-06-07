@@ -26,14 +26,14 @@ import (
 	cryptoRand "crypto/rand"
 {{- end }}
 
-	"github.com/cloudflare/circl/sign"
+	"github.com/quantumcoinproject/circl/sign"
 
 {{- if .NIST }}
-	"github.com/cloudflare/circl/sign/mldsa/{{.Pkg}}/internal"
+	"github.com/quantumcoinproject/circl/sign/mldsa/{{.Pkg}}/internal"
 {{- else }}
-	"github.com/cloudflare/circl/sign/dilithium/{{.Pkg}}/internal"
+	"github.com/quantumcoinproject/circl/sign/dilithium/{{.Pkg}}/internal"
 {{- end }}
-	common "github.com/cloudflare/circl/sign/internal/dilithium"
+	common "github.com/quantumcoinproject/circl/sign/internal/dilithium"
 )
 
 const (

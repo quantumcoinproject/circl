@@ -9,8 +9,8 @@ package k12
 import (
 	"encoding/binary"
 
-	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/simd/keccakf1600"
+	"github.com/quantumcoinproject/circl/internal/sha3"
+	"github.com/quantumcoinproject/circl/simd/keccakf1600"
 )
 
 const chunkSize = 8192 // aka B

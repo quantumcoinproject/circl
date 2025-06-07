@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cloudflare/circl/kem/schemes"
+	"github.com/quantumcoinproject/circl/kem/schemes"
 )
 
 // []byte but is encoded in hex for JSON

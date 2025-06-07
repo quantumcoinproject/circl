@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/cloudflare/circl/group"
-	"github.com/cloudflare/circl/zk/dl"
+	"github.com/quantumcoinproject/circl/group"
+	"github.com/quantumcoinproject/circl/zk/dl"
 )
 
 const testzkDLCount = 1 << 8

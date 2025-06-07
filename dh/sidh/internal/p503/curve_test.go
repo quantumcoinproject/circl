@@ -6,7 +6,7 @@ package p503
 import (
 	"bytes"
 	crand "crypto/rand"
-	. "github.com/cloudflare/circl/dh/sidh/internal/common"
+	. "github.com/quantumcoinproject/circl/dh/sidh/internal/common"
 	"io"
 	"math"
 	"math/rand"

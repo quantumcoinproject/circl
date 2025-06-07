@@ -10,9 +10,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudflare/circl/sign"
-	common "github.com/cloudflare/circl/sign/internal/dilithium"
-	"github.com/cloudflare/circl/sign/mldsa/mldsa44/internal"
+	"github.com/quantumcoinproject/circl/sign"
+	common "github.com/quantumcoinproject/circl/sign/internal/dilithium"
+	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44/internal"
 )
 
 const (

@@ -4,8 +4,8 @@ import (
 	"crypto/ecdh"
 	cryptoRand "crypto/rand"
 
-	"github.com/cloudflare/circl/kem"
-	"github.com/cloudflare/circl/xof"
+	"github.com/quantumcoinproject/circl/kem"
+	"github.com/quantumcoinproject/circl/xof"
 )
 
 type cPublicKey struct {

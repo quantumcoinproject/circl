@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cloudflare/circl/internal/nist"
-	"github.com/cloudflare/circl/kem/schemes"
+	"github.com/quantumcoinproject/circl/internal/nist"
+	"github.com/quantumcoinproject/circl/kem/schemes"
 )
 
 func TestPQCgenKATKem(t *testing.T) {
