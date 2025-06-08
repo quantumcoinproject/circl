@@ -133,18 +133,3 @@ func (s *signature) fromBytes(p *params, c *cursor) bool {
 	s.htSig.fromBytes(p, c)
 	return len(*c) == 0
 }
-
-func isDeterministicSignature(pub *PublicKey, sigBytes []byte) (bool, error) {
-	p := pub.ID.params()
-	var sig signature
-	curSig := cursor(sigBytes)
-	if !sig.fromBytes(p, &curSig) {
-		return false, ErrSigParse
-	}
-	for _, val := range sig.rnd {
-		if val == 1 {
-			return false, nil
-		}
-	}
-	return true, nil
-}
