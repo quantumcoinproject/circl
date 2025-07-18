@@ -3,6 +3,8 @@ package hybridedsfull
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"github.com/quantumcoinproject/circl/internal/sha3"
 	"github.com/quantumcoinproject/circl/sign/ed25519"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44"
 	"github.com/quantumcoinproject/circl/sign/slhdsa"
@@ -84,8 +86,10 @@ const (
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
 	SecretKeySize        = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
 
-	SeedSizeSlhDsda = 96
-	SeedSize        = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
+	SeedSizeSlhDsda    = 96
+	SeedSize           = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
+	BaseSeedSize       = 96
+	SeedExpanderDomain = byte(2)
 )
 
 type PublicKey struct {
@@ -161,4 +165,58 @@ func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error)
 func NewKeyFromSeed(seed *[SeedSize]byte) (*PublicKey, *PrivateKey, error) {
 	seedBuff := bytes.NewReader(seed[:])
 	return GenerateKey(seedBuff)
+}
+
+func ExpandSeed(baseSeed *[BaseSeedSize]byte) (*[SeedSize]byte, error) {
+	/*
+	 * @brief Implementation of seed expander that expands a seed specific to dilithium_ed25519_sphincs for purpose of key generation.
+	 * Use this function only for specific cases like blockchain seed mnemonics where less number of seed bytes are required for human readability and mangeability.
+	 * All other cases should directly generate all the 160 bytes at random using a CSPRNG.
+	 * The input seed should be created from a CSPRNG.
+	 * 64 bytes of the input seed is first expanded to 128 bytes (32 bytes for ed25519 and 96 bytes for SPHINCS+)
+	 * The remaining 32 bytes of the input is copied as-is in the expanded seed.
+	 * An alternative scheme is we just take 64 bytes input seed and return 160 bytes output expanded seed, instead of this complicated scheme.
+	 * The rationale for doing complicated expansion instead is that;
+	 * Some of the expanded seed bytes are copied as is to the SPHINCS+ public key when this expanded seed is subsequently used for generating the keypair (as part of SPHINCS+ internal implementation).
+	 * While it shouldn’t matter if we expose some parts of the csprng output (it is computationally infeasible to recover the remaining unexposed part),
+	 * as a long term hedge for using this XOF, we choose to have atleast one part of the hybrid signature scheme use the original seed material directly, than from the XOF.
+	 * On why ed25519 and SPHINCS+ specifically instead of a different combination from the 3 schemes;  during the normal course of signing using the compact scheme, the SPHINCS+ key isn't used at all.
+	 * To maintain quantum resistance in case there is an issue with this XOF, Dilithium is used (instead of Dilithium + SPHINCS+), so that we have atleast one quantum resistance scheme that isn't relying on this expansion XOF.
+	 */
+	panic("do'nt use, not working yet")
+	var ed25519Seed [ed25519.SeedSize]byte
+	var mlDsaSeed [mldsa44.SeedSize]byte
+	var slhdsaSeed [SeedSizeSlhDsda]byte
+	var expandedSeed [SeedSize]byte
+
+	h := sha3.NewShake256()
+	_, err := h.Write(baseSeed[:64])
+	if err != nil {
+		return nil, err
+	}
+	_, err = h.Write([]byte{SeedExpanderDomain})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = h.Read(ed25519Seed[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = h.Read(slhdsaSeed[:])
+	if err != nil {
+		return nil, err
+	}
+
+	copy(mlDsaSeed[:], baseSeed[64:])
+	fmt.Println("ed25519Seed", ed25519Seed)
+	fmt.Println("mlDsaSeed", mlDsaSeed)
+	fmt.Println("slhdsaSeed", slhdsaSeed)
+
+	copy(expandedSeed[:], ed25519Seed[:])
+	copy(expandedSeed[ed25519.SeedSize:], mlDsaSeed[:])
+	copy(expandedSeed[ed25519.SeedSize+mldsa44.SeedSize:], slhdsaSeed[:])
+
+	return &expandedSeed, nil
 }
