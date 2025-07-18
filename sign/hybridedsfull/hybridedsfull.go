@@ -1,6 +1,7 @@
 package hybridedsfull
 
 import (
+	"bytes"
 	"errors"
 	"github.com/quantumcoinproject/circl/sign/ed25519"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44"
@@ -82,6 +83,9 @@ const (
 	SlhDsaPrivateKeySize = 128
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
 	SecretKeySize        = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
+
+	SeedSizeSlhDsda = 96
+	SeedSize        = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
 )
 
 type PublicKey struct {
@@ -101,7 +105,6 @@ func (k PrivateKey) MarshalBinary() ([]byte, error) {
 }
 
 func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error) {
-
 	eddsaPubKey, eddsaPriKey, err := ed25519.GenerateKey(random)
 	if err != nil {
 		return nil, nil, err
@@ -153,4 +156,9 @@ func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error)
 	copy(priv.key, priKeyBytes)
 
 	return pub, priv, nil
+}
+
+func NewKeyFromSeed(seed *[SeedSize]byte) (*PublicKey, *PrivateKey, error) {
+	seedBuff := bytes.NewReader(seed[:])
+	return GenerateKey(seedBuff)
 }
