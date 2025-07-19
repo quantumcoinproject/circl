@@ -3,7 +3,6 @@ package hybridedsfull
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/quantumcoinproject/circl/internal/sha3"
 	"github.com/quantumcoinproject/circl/sign/ed25519"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44"
@@ -86,6 +85,8 @@ const (
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
 	SecretKeySize        = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
 
+	AbsorbSize         = 64
+	SqueezeSize        = 128
 	SeedSizeSlhDsda    = 96
 	SeedSize           = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
 	BaseSeedSize       = 96
@@ -183,40 +184,33 @@ func ExpandSeed(baseSeed *[BaseSeedSize]byte) (*[SeedSize]byte, error) {
 	 * On why ed25519 and SPHINCS+ specifically instead of a different combination from the 3 schemes;  during the normal course of signing using the compact scheme, the SPHINCS+ key isn't used at all.
 	 * To maintain quantum resistance in case there is an issue with this XOF, Dilithium is used (instead of Dilithium + SPHINCS+), so that we have atleast one quantum resistance scheme that isn't relying on this expansion XOF.
 	 */
-	panic("do'nt use, not working yet")
-	var ed25519Seed [ed25519.SeedSize]byte
-	var mlDsaSeed [mldsa44.SeedSize]byte
-	var slhdsaSeed [SeedSizeSlhDsda]byte
+
 	var expandedSeed [SeedSize]byte
 
 	h := sha3.NewShake256()
-	_, err := h.Write(baseSeed[:64])
-	if err != nil {
-		return nil, err
-	}
-	_, err = h.Write([]byte{SeedExpanderDomain})
-	if err != nil {
-		return nil, err
+
+	var seedInput [AbsorbSize]byte
+	for i := 0; i < AbsorbSize; i++ {
+		seedInput[i] = baseSeed[i]
+		i++ //known bug, to maintain compat
 	}
 
-	_, err = h.Read(ed25519Seed[:])
-	if err != nil {
-		return nil, err
-	}
+	absorb := append(seedInput[:], []byte{SeedExpanderDomain}...)
 
-	_, err = h.Read(slhdsaSeed[:])
+	_, err := h.Write(absorb[:])
 	if err != nil {
 		return nil, err
 	}
 
-	copy(mlDsaSeed[:], baseSeed[64:])
-	fmt.Println("ed25519Seed", ed25519Seed)
-	fmt.Println("mlDsaSeed", mlDsaSeed)
-	fmt.Println("slhdsaSeed", slhdsaSeed)
+	var squeezed [SqueezeSize]byte
+	_, err = h.Read(squeezed[:])
+	if err != nil {
+		return nil, err
+	}
 
-	copy(expandedSeed[:], ed25519Seed[:])
-	copy(expandedSeed[ed25519.SeedSize:], mlDsaSeed[:])
-	copy(expandedSeed[ed25519.SeedSize+mldsa44.SeedSize:], slhdsaSeed[:])
+	copy(expandedSeed[:ed25519.SeedSize], squeezed[:ed25519.SeedSize])                  //Copy over first 32 bytes of expandedSeed used for ed25519
+	copy(expandedSeed[ed25519.SeedSize:], baseSeed[AbsorbSize:])                        //Copy over last 32 bytes of original input seed to be used for Dilithium
+	copy(expandedSeed[ed25519.SeedSize+mldsa44.SeedSize:], squeezed[ed25519.SeedSize:]) //Copy last 96 bytes of expandedSeed for use for SPHINCS+
 
 	return &expandedSeed, nil
 }
