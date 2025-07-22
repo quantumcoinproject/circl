@@ -132,6 +132,28 @@ func (pub PublicKey) MarshalBinary() (data []byte, err error) {
 	return publicKey, nil
 }
 
+// Unpacks the public key from data.
+func UnmarshalPublicKey(data []byte) (*PublicKey, error) {
+	if len(data) != PublicKeySize {
+		return nil, errors.New(fmt.Sprintf("packed public key must be of %d bytes", PublicKeySize))
+	}
+	publicKey := make(PublicKey, PublicKeySize)
+	copy(publicKey, data)
+
+	return &publicKey, nil
+}
+
+// Unpacks the private key from data.
+func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
+	if len(data) != PrivateKeySize {
+		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
+	}
+	privateKey := make(PrivateKey, PrivateKeySize)
+	copy(privateKey, data)
+
+	return &privateKey, nil
+}
+
 // Equal reports whether pub and x have the same value.
 func (pub PublicKey) Equal(x crypto.PublicKey) bool {
 	xx, ok := x.(PublicKey)

@@ -3,6 +3,7 @@ package hybridedsfull
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/quantumcoinproject/circl/sign/ed25519"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44"
 	"github.com/quantumcoinproject/circl/sign/slhdsa"
@@ -86,7 +87,6 @@ const (
 
 	SeedSizeSlhDsda = 96
 	SeedSize        = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
-	BaseSeedSize    = 96
 )
 
 type PublicKey struct {
@@ -97,13 +97,60 @@ type PrivateKey struct {
 	key []byte
 }
 
-func (k PublicKey) MarshalBinary() ([]byte, error) {
-	return k.key[:], nil
+func (pk *PublicKey) MarshalBinary() ([]byte, error) {
+	if pk.key == nil || len(pk.key) != PublicKeySize {
+		return nil, errors.New("invalid public key")
+	}
+	tmp := make([]byte, PublicKeySize)
+	copy(tmp, pk.key)
+	return tmp, nil
 }
 
-func (k PrivateKey) MarshalBinary() ([]byte, error) {
-	return k.key[:], nil
+func (sk *PrivateKey) MarshalBinary() ([]byte, error) {
+	if sk.key == nil || len(sk.key) != SecretKeySize {
+		return nil, errors.New("invalid private key")
+	}
+	tmp := make([]byte, SecretKeySize)
+	copy(tmp, sk.key)
+	return tmp, nil
 }
+
+// Unpacks the public key from data.
+func UnmarshalPublicKey(data []byte) (*PublicKey, error) {
+	if len(data) != PublicKeySize {
+		return nil, errors.New(fmt.Sprintf("packed public key must be of %d bytes", PublicKeySize))
+	}
+	var pub PublicKey
+
+	pub.key = make([]byte, PublicKeySize)
+	copy(pub.key, data)
+
+	return &pub, nil
+}
+
+// Unpacks the private key from data.
+func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
+	if len(data) != SecretKeySize {
+		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", SecretKeySize))
+	}
+	var priv PrivateKey
+
+	priv.key = make([]byte, SecretKeySize)
+	copy(priv.key, data)
+
+	return &priv, nil
+}
+
+/*
+func (sk *PrivateKey) getEdd25519Key() (priKey *ed25519.PrivateKey, pubKey *ed25519.PublicKey, err error) {
+	if len(sk.key) != SecretKeySize || len(sk.key) != SecretKeySize {
+		return nil, nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", SecretKeySize))
+	}
+	key := make(ed25519.PrivateKey, ed25519.PrivateKeySize)
+	copy(key[:], sk.key[:ed25519.PrivateKeySize])
+	priKey = &key
+
+}*/
 
 func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error) {
 	eddsaPubKey, eddsaPriKey, err := ed25519.GenerateKey(random)
@@ -162,4 +209,8 @@ func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error)
 func NewKeyFromSeed(seed *[SeedSize]byte) (*PublicKey, *PrivateKey, error) {
 	seedBuff := bytes.NewReader(seed[:])
 	return GenerateKey(seedBuff)
+}
+
+func Sign(priv *PrivateKey, random io.Reader, msg []byte) (signature []byte, err error) {
+	return nil, nil
 }
