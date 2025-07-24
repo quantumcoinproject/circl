@@ -83,7 +83,7 @@ const (
 	SlhDsaPublicKeySize  = 64
 	SlhDsaPrivateKeySize = 128
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
-	SecretKeySize        = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
+	PrivateKeySize       = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
 
 	SeedSizeSlhDsda = 96
 	SeedSize        = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
@@ -107,10 +107,10 @@ func (pk *PublicKey) MarshalBinary() ([]byte, error) {
 }
 
 func (sk *PrivateKey) MarshalBinary() ([]byte, error) {
-	if sk.key == nil || len(sk.key) != SecretKeySize {
+	if sk.key == nil || len(sk.key) != PrivateKeySize {
 		return nil, errors.New("invalid private key")
 	}
-	tmp := make([]byte, SecretKeySize)
+	tmp := make([]byte, PrivateKeySize)
 	copy(tmp, sk.key)
 	return tmp, nil
 }
@@ -130,27 +130,86 @@ func UnmarshalPublicKey(data []byte) (*PublicKey, error) {
 
 // Unpacks the private key from data.
 func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
-	if len(data) != SecretKeySize {
-		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", SecretKeySize))
+	if len(data) != PrivateKeySize {
+		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
 	var priv PrivateKey
 
-	priv.key = make([]byte, SecretKeySize)
+	priv.key = make([]byte, PrivateKeySize)
 	copy(priv.key, data)
 
 	return &priv, nil
 }
 
-/*
-func (sk *PrivateKey) getEdd25519Key() (priKey *ed25519.PrivateKey, pubKey *ed25519.PublicKey, err error) {
-	if len(sk.key) != SecretKeySize || len(sk.key) != SecretKeySize {
-		return nil, nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", SecretKeySize))
+func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKey *mldsa44.PrivateKey, slhdsaPriKey *slhdsa.PrivateKey, err error) {
+	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
+		return nil, nil, nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
-	key := make(ed25519.PrivateKey, ed25519.PrivateKeySize)
-	copy(key[:], sk.key[:ed25519.PrivateKeySize])
-	priKey = &key
+	sk1 := make([]byte, ed25519.PrivateKeySize)
+	copy(sk1[:], sk.key[:ed25519.PrivateKeySize])
 
-}*/
+	sk2 := make([]byte, mldsa44.PrivateKeySize)
+	copy(sk2[:], sk.key[ed25519.PrivateKeySize:ed25519.PrivateKeySize+mldsa44.PrivateKeySize+mldsa44.PublicKeySize])
+
+	sk3 := make([]byte, SlhDsaPrivateKeySize)
+	copy(sk3[:], sk.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize+mldsa44.PublicKeySize:])
+
+	//fmt.Println(len(sk.key), len(sk1), len(sk.key[ed25519.PrivateKeySize:ed25519.PrivateKeySize+mldsa44.PrivateKeySize]), len(sk.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize:]))
+
+	edPriKey, err = ed25519.UnmarshalPrivateKey(sk1)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	mldsaPriKey, err = mldsa44.UnmarshalPrivateKey(sk2)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var skey slhdsa.PrivateKey
+	skey.ID = slhdsa.SHAKE_256f
+	err = skey.UnmarshalBinary(sk3)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	slhdsaPriKey = &skey
+
+	return
+}
+
+func (sk *PublicKey) getPublicKeys() (edPubKey *ed25519.PublicKey, mldsaPubKey *mldsa44.PublicKey, slhdsaPubKey *slhdsa.PublicKey, err error) {
+	if len(sk.key) != PublicKeySize || len(sk.key) != PublicKeySize {
+		return nil, nil, nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PublicKeySize))
+	}
+	sk1 := make([]byte, ed25519.PublicKeySize)
+	copy(sk1[:], sk.key[:ed25519.PublicKeySize])
+
+	sk2 := make([]byte, mldsa44.PublicKeySize)
+	copy(sk2[:], sk.key[ed25519.PublicKeySize:ed25519.PublicKeySize+mldsa44.PublicKeySize])
+
+	sk3 := make([]byte, SlhDsaPublicKeySize)
+	copy(sk3[:], sk.key[ed25519.PublicKeySize+mldsa44.PublicKeySize:])
+
+	edPubKey, err = ed25519.UnmarshalPublicKey(sk1)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	mldsaPubKey, err = mldsa44.UnmarshalPublicKey(sk2)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var skey slhdsa.PublicKey
+	skey.ID = slhdsa.SHAKE_256f
+	err = skey.UnmarshalBinary(sk3)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	slhdsaPubKey = &skey
+
+	return
+}
 
 func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error) {
 	eddsaPubKey, eddsaPriKey, err := ed25519.GenerateKey(random)
@@ -189,7 +248,7 @@ func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error)
 	priKeyBytes = append(priKeyBytes, mldsaPubKey.Bytes()...)
 	priKeyBytes = append(priKeyBytes, slhdsaPriKeyBytes...)
 
-	if len(priKeyBytes) != SecretKeySize {
+	if len(priKeyBytes) != PrivateKeySize {
 		return nil, nil, errors.New("invalid private key size")
 	}
 
@@ -197,7 +256,7 @@ func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error)
 		key: make([]byte, PublicKeySize),
 	}
 	priv = &PrivateKey{
-		key: make([]byte, SecretKeySize),
+		key: make([]byte, PrivateKeySize),
 	}
 
 	copy(pub.key, pubKeyBytes)
