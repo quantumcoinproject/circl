@@ -98,7 +98,7 @@ func (sk *PrivateKey) unsafeSignInternal(msg []byte, rnd [32]byte) []byte {
 	return ret[:]
 }
 
-func (sk *PrivateKey) SignNoContext(msg []byte, rnd [32]byte) []byte {
+func SignNoContext(sk *PrivateKey, msg []byte, rnd [32]byte) []byte {
 	var ret [SignatureSize]byte
 	internal.SignTo(
 		(*internal.PrivateKey)(sk),

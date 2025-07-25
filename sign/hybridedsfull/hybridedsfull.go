@@ -85,8 +85,17 @@ const (
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
 	PrivateKeySize       = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
 
-	SeedSizeSlhDsda = 96
-	SeedSize        = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
+	SeedSizeSlhDsda                   = 96
+	SeedSize                          = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
+	CRYPTO_MSG_LENGTH                 = 32
+	DILITHIUM_ED25519_SPHINCS_FULL_ID = byte(2)
+
+	ED25518_SIG_LENGTH      = 64
+	MLDSA44_SIG_LENGTH      = 2420
+	SLHDSA_SIG_LENGTH       = 49856
+	MLDSA44_SIG_RAND_LENGTH = 32
+
+	SigLength = 1 + 1 + ED25518_SIG_LENGTH + CRYPTO_MSG_LENGTH + MLDSA44_SIG_LENGTH + SLHDSA_SIG_LENGTH
 )
 
 type PublicKey struct {
@@ -270,6 +279,53 @@ func NewKeyFromSeed(seed *[SeedSize]byte) (*PublicKey, *PrivateKey, error) {
 	return GenerateKey(seedBuff)
 }
 
-func Sign(priv *PrivateKey, random io.Reader, msg []byte) (signature []byte, err error) {
-	return nil, nil
+func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature [SigLength]byte, err error) {
+	if msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
+		return signature, errors.New("invalid message")
+	}
+	if priv == nil {
+		return signature, errors.New("private key is nil")
+	}
+	key1, key2, key3, err := priv.getPrivateKeys()
+	if err != nil {
+		return signature, err
+	}
+
+	var mldsaRnd [MLDSA44_SIG_RAND_LENGTH]byte
+	_, err = rand.Read(mldsaRnd[:])
+	if err != nil {
+		return signature, err
+	}
+
+	sig1 := ed25519.Sign(*key1, msg)
+	sig2 := mldsa44.SignNoContext(key2, msg, mldsaRnd)
+	sig3, err := slhdsa.SignRandomizedNoContext(key3, rand, msg)
+
+	if err != nil {
+		return signature, err
+	}
+
+	if sig1 == nil || sig2 == nil || sig3 == nil {
+		return signature, errors.New("invalid signature")
+	}
+
+	if len(sig1) != ED25518_SIG_LENGTH || len(sig2) != MLDSA44_SIG_LENGTH || len(sig3) != SLHDSA_SIG_LENGTH {
+		return signature, errors.New("invalid signature length")
+	}
+
+	signature[0] = DILITHIUM_ED25519_SPHINCS_FULL_ID
+	signature[1] = CRYPTO_MSG_LENGTH
+	copy(signature[2:], sig1)
+	copy(signature[2+len(sig1):], sig2)
+	copy(signature[2+len(sig1)+len(sig3):], sig3)
+
+	return signature, nil
+}
+
+func Verify(pk *PublicKey, msg []byte, sig []byte) bool {
+	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH || sig == nil || len(sig) != SigLength {
+		return false
+	}
+
+	return false
 }
