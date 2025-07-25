@@ -138,3 +138,52 @@ func TestGetKeys(t *testing.T) {
 		t.Fatalf("failed")
 	}
 }
+
+func TestSignVerifyBasic(t *testing.T) {
+	seed := [SeedSize]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159}
+	pubKey, priKey, err := NewKeyFromSeed(&seed)
+	if err != nil {
+		t.Fatalf("failed")
+	}
+	var msg [CRYPTO_MSG_LENGTH]byte
+	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
+		msg[i] = i
+	}
+	random := rand.Reader
+	signature, err := Sign(priKey, random, msg[:])
+	if err != nil {
+		fmt.Println(err)
+		t.Fatalf("failed")
+	}
+
+	if Verify(pubKey, msg[:], signature) == false {
+		t.Fatalf("verify failed")
+	}
+
+	var msg2 [CRYPTO_MSG_LENGTH]byte
+	copy(msg2[:], msg[:])
+	if Verify(pubKey, msg[:], signature) == false {
+		t.Fatalf("verify failed")
+	}
+	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
+		copy(msg2[:], msg[:])
+		msg2[i] = msg2[i] + 1
+		if Verify(pubKey, msg2[:], signature) == true {
+			t.Fatalf("verify passed unexpectedly")
+		}
+	}
+
+	var signature2 [SigLength]byte
+	copy(signature2[:], signature[:])
+	if Verify(pubKey, msg[:], signature2) == false {
+		t.Fatalf("verify failed")
+	}
+	for i := 0; i < SigLength; i++ {
+		copy(signature2[:], signature[:])
+		signature2[i] = signature[i] + 1
+		if Verify(pubKey, msg[:], signature2) == true {
+			fmt.Println(i, signature[i], signature2[i])
+			t.Fatalf("verify passed unexpectedly")
+		}
+	}
+}

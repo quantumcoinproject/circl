@@ -316,16 +316,53 @@ func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature [SigLength]by
 	signature[0] = DILITHIUM_ED25519_SPHINCS_FULL_ID
 	signature[1] = CRYPTO_MSG_LENGTH
 	copy(signature[2:], sig1)
-	copy(signature[2+len(sig1):], sig2)
-	copy(signature[2+len(sig1)+len(sig3):], sig3)
+	copy(signature[2+len(sig1):], msg)
+	copy(signature[2+len(sig1)+len(msg):], sig2)
+	copy(signature[2+len(sig1)+len(msg)+len(sig2):], sig3)
 
 	return signature, nil
 }
 
-func Verify(pk *PublicKey, msg []byte, sig []byte) bool {
-	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH || sig == nil || len(sig) != SigLength {
+func Verify(pk *PublicKey, msg []byte, signature [SigLength]byte) bool {
+	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
 		return false
 	}
 
-	return false
+	if signature[0] != DILITHIUM_ED25519_SPHINCS_FULL_ID {
+		return false
+	}
+
+	if signature[1] != byte(len(msg)) {
+		return false
+	}
+
+	//first verify msg from signature
+	if bytes.Equal(signature[2+ED25518_SIG_LENGTH:2+ED25518_SIG_LENGTH+CRYPTO_MSG_LENGTH], msg) == false {
+		return false
+	}
+
+	key1, key2, key3, err := pk.getPublicKeys()
+	if err != nil {
+		return false
+	}
+	if key1 == nil || key2 == nil || key3 == nil {
+		return false
+	}
+
+	sig1 := signature[2 : 2+ED25518_SIG_LENGTH]
+	if ed25519.Verify(*key1, msg, sig1) == false {
+		return false
+	}
+
+	sig2 := signature[2+ED25518_SIG_LENGTH+len(msg) : 2+ED25518_SIG_LENGTH+len(msg)+MLDSA44_SIG_LENGTH]
+	if mldsa44.VerifyNoContext(key2, msg, sig2) == false {
+		return false
+	}
+
+	sig3 := signature[2+ED25518_SIG_LENGTH+len(msg)+MLDSA44_SIG_LENGTH:]
+	if slhdsa.VerifyNoContext(key3, msg, sig3) == false {
+		return false
+	}
+
+	return true
 }
