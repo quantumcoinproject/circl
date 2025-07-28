@@ -1,4 +1,4 @@
-package hybridedsfull
+package hybrideds
 
 import (
 	"bytes"
