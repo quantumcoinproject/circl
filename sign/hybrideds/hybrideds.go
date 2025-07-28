@@ -2,6 +2,7 @@ package hybrideds
 
 import (
 	"bytes"
+	"crypto/sha3"
 	"errors"
 	"fmt"
 	"github.com/quantumcoinproject/circl/sign/ed25519"
@@ -85,17 +86,21 @@ const (
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
 	PrivateKeySize       = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
 
-	SeedSizeSlhDsda                   = 96
-	SeedSize                          = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
-	CRYPTO_MSG_LENGTH                 = 32
-	DILITHIUM_ED25519_SPHINCS_FULL_ID = byte(2)
+	SeedSizeSlhDsda                      = 96
+	SeedSize                             = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
+	CRYPTO_MSG_LENGTH                    = 32
+	DILITHIUM_ED25519_SPHINCS_COMPACT_ID = byte(1)
+	DILITHIUM_ED25519_SPHINCS_FULL_ID    = byte(2)
 
 	ED25518_SIG_LENGTH      = 64
 	MLDSA44_SIG_LENGTH      = 2420
 	SLHDSA_SIG_LENGTH       = 49856
 	MLDSA44_SIG_RAND_LENGTH = 32
 
-	SigLength = 1 + 1 + ED25518_SIG_LENGTH + CRYPTO_MSG_LENGTH + MLDSA44_SIG_LENGTH + SLHDSA_SIG_LENGTH
+	NonceSize = 40
+
+	CompactSigLength = 1 + 1 + ED25518_SIG_LENGTH + MLDSA44_SIG_LENGTH + NonceSize + CRYPTO_MSG_LENGTH
+	SigLength        = 1 + 1 + ED25518_SIG_LENGTH + CRYPTO_MSG_LENGTH + MLDSA44_SIG_LENGTH + SLHDSA_SIG_LENGTH
 )
 
 type PublicKey struct {
@@ -186,18 +191,36 @@ func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKe
 	return
 }
 
-func (sk *PublicKey) getPublicKeys() (edPubKey *ed25519.PublicKey, mldsaPubKey *mldsa44.PublicKey, slhdsaPubKey *slhdsa.PublicKey, err error) {
-	if len(sk.key) != PublicKeySize || len(sk.key) != PublicKeySize {
-		return nil, nil, nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PublicKeySize))
+func (sk *PrivateKey) getPublicKey() (edsPubKey *PublicKey, err error) {
+	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
+		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
+	}
+
+	pubKeyBytes := make([]byte, PublicKeySize)
+	copy(pubKeyBytes, sk.key[32:64])
+	copy(pubKeyBytes[ed25519.PublicKeySize:], sk.key[64+2560:64+2560+1312])
+	copy(pubKeyBytes[ed25519.PublicKeySize+mldsa44.PublicKeySize:], sk.key[64+2560+1312+64:])
+
+	edsPubKey = &PublicKey{
+		key: make([]byte, PublicKeySize),
+	}
+	copy(edsPubKey.key, pubKeyBytes)
+
+	return edsPubKey, nil
+}
+
+func (pk *PublicKey) getPublicKeys() (edPubKey *ed25519.PublicKey, mldsaPubKey *mldsa44.PublicKey, slhdsaPubKey *slhdsa.PublicKey, err error) {
+	if len(pk.key) != PublicKeySize || len(pk.key) != PublicKeySize {
+		return nil, nil, nil, errors.New(fmt.Sprintf("packed public key must be of %d bytes", PublicKeySize))
 	}
 	sk1 := make([]byte, ed25519.PublicKeySize)
-	copy(sk1[:], sk.key[:ed25519.PublicKeySize])
+	copy(sk1[:], pk.key[:ed25519.PublicKeySize])
 
 	sk2 := make([]byte, mldsa44.PublicKeySize)
-	copy(sk2[:], sk.key[ed25519.PublicKeySize:ed25519.PublicKeySize+mldsa44.PublicKeySize])
+	copy(sk2[:], pk.key[ed25519.PublicKeySize:ed25519.PublicKeySize+mldsa44.PublicKeySize])
 
 	sk3 := make([]byte, SlhDsaPublicKeySize)
-	copy(sk3[:], sk.key[ed25519.PublicKeySize+mldsa44.PublicKeySize:])
+	copy(sk3[:], pk.key[ed25519.PublicKeySize+mldsa44.PublicKeySize:])
 
 	edPubKey, err = ed25519.UnmarshalPublicKey(sk1)
 	if err != nil {
@@ -361,6 +384,142 @@ func Verify(pk *PublicKey, msg []byte, signature [SigLength]byte) bool {
 
 	sig3 := signature[2+ED25518_SIG_LENGTH+len(msg)+MLDSA44_SIG_LENGTH:]
 	if slhdsa.VerifyNoContext(key3, msg, sig3) == false {
+		return false
+	}
+
+	return true
+}
+
+func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature [CompactSigLength]byte, err error) {
+	if msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
+		return signature, errors.New("invalid message")
+	}
+	if priv == nil {
+		return signature, errors.New("private key is nil")
+	}
+	key1, key2, _, err := priv.getPrivateKeys()
+	if err != nil {
+		return signature, err
+	}
+
+	var nonce [NonceSize]byte
+	bytesRead, err := rand.Read(nonce[:])
+	if err != nil {
+		return signature, err
+	}
+	if bytesRead != NonceSize {
+		return signature, errors.New("invalid bytesRead nonce")
+	}
+
+	//Get SLH DSA public key
+	pubKey, err := priv.getPublicKey()
+	if err != nil {
+		return signature, err
+	}
+	_, _, slhdsaPubKey, err := pubKey.getPublicKeys()
+	if err != nil {
+		return signature, err
+	}
+	slhdsaPubKeyBytes, err := slhdsaPubKey.MarshalBinary()
+	if err != nil {
+		return signature, err
+	}
+
+	//Form hybrid msg
+	var hybridMsg [NonceSize + CRYPTO_MSG_LENGTH + SlhDsaPublicKeySize]byte
+	copy(hybridMsg[:], nonce[:])
+	copy(hybridMsg[NonceSize:], msg[:])
+	copy(hybridMsg[NonceSize+len(msg):], slhdsaPubKeyBytes[:])
+
+	//Form hybrid msg hash
+	hasher := sha3.New512()
+	_, err = hasher.Write(hybridMsg[:])
+	if err != nil {
+		return signature, err
+	}
+	hybridMsgHash := hasher.Sum(nil)
+
+	var mldsaRnd [MLDSA44_SIG_RAND_LENGTH]byte
+	bytesRead, err = rand.Read(mldsaRnd[:])
+	if err != nil {
+		return signature, err
+	}
+	if bytesRead != MLDSA44_SIG_RAND_LENGTH {
+		return signature, errors.New("invalid bytesRead nonce")
+	}
+
+	sig1 := ed25519.Sign(*key1, hybridMsgHash)
+	sig2 := mldsa44.SignNoContext(key2, hybridMsgHash, mldsaRnd)
+
+	if sig1 == nil || sig2 == nil {
+		return signature, errors.New("invalid signature")
+	}
+
+	if len(sig1) != ED25518_SIG_LENGTH || len(sig2) != MLDSA44_SIG_LENGTH {
+		return signature, errors.New("invalid signature length")
+	}
+
+	signature[0] = DILITHIUM_ED25519_SPHINCS_COMPACT_ID
+	signature[1] = CRYPTO_MSG_LENGTH
+	copy(signature[2:], sig1)
+	copy(signature[2+len(sig1):], sig2)
+	copy(signature[2+len(sig1)+len(sig2):], nonce[:])
+	copy(signature[2+len(sig1)+len(sig2)+len(nonce):], msg)
+
+	return signature, nil
+}
+
+func VerifyCompact(pk *PublicKey, msg []byte, signature [CompactSigLength]byte) bool {
+	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
+		return false
+	}
+
+	if signature[0] != DILITHIUM_ED25519_SPHINCS_COMPACT_ID {
+		return false
+	}
+
+	if signature[1] != byte(len(msg)) {
+		return false
+	}
+
+	//first verify msg from signature
+	if bytes.Equal(signature[2+ED25518_SIG_LENGTH+MLDSA44_SIG_LENGTH+NonceSize:2+ED25518_SIG_LENGTH+MLDSA44_SIG_LENGTH+NonceSize+CRYPTO_MSG_LENGTH], msg) == false {
+		return false
+	}
+
+	key1, key2, slhdsaPubKey, err := pk.getPublicKeys()
+	if err != nil {
+		return false
+	}
+	if key1 == nil || key2 == nil || slhdsaPubKey == nil {
+		return false
+	}
+	slhdsaPubKeyBytes, err := slhdsaPubKey.MarshalBinary()
+	if err != nil {
+		return false
+	}
+
+	//Form hybrid msg
+	var hybridMsg [NonceSize + CRYPTO_MSG_LENGTH + SlhDsaPublicKeySize]byte
+	copy(hybridMsg[:], signature[2+ED25518_SIG_LENGTH+MLDSA44_SIG_LENGTH:2+ED25518_SIG_LENGTH+MLDSA44_SIG_LENGTH+NonceSize]) //nonce
+	copy(hybridMsg[NonceSize:], msg[:])
+	copy(hybridMsg[NonceSize+len(msg):], slhdsaPubKeyBytes[:])
+
+	//Form hybrid msg hash
+	hasher := sha3.New512()
+	_, err = hasher.Write(hybridMsg[:])
+	if err != nil {
+		return false
+	}
+	hybridMsgHash := hasher.Sum(nil)
+
+	sig1 := signature[2 : 2+ED25518_SIG_LENGTH]
+	if ed25519.Verify(*key1, hybridMsgHash, sig1) == false {
+		return false
+	}
+
+	sig2 := signature[2+ED25518_SIG_LENGTH : 2+ED25518_SIG_LENGTH+MLDSA44_SIG_LENGTH]
+	if mldsa44.VerifyNoContext(key2, hybridMsgHash, sig2) == false {
 		return false
 	}
 
