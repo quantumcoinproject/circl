@@ -21,7 +21,9 @@ func TestGenKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed")
 	}
-	fmt.Println("pubKey:", pubKey, "priKey:", priKey)
+	if pubKey == nil || priKey == nil {
+		t.Fatalf("failed to generate key")
+	}
 
 	var seed1 [SeedSize]byte
 	var seed3 [SeedSize]byte
@@ -42,9 +44,9 @@ func TestGenKey(t *testing.T) {
 		t.Fatalf("failed")
 	}
 
-	fmt.Println("pubKey1:", pubKey1, "priKey1:", priKey1)
-	fmt.Println("pubKey2:", pubKey2, "priKey2:", priKey2)
-	fmt.Println("pubKey3:", pubKey3, "priKey3:", priKey3)
+	if bytes.Compare(priKey1.key, priKey2.key) != 0 {
+		t.Fatalf("private keys do not match")
+	}
 
 	if bytes.Compare(pubKey1.key, pubKey2.key) != 0 {
 		t.Fatalf("public keys do not match")

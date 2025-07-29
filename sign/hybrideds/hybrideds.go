@@ -168,8 +168,6 @@ func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKe
 	sk3 := make([]byte, SlhDsaPrivateKeySize)
 	copy(sk3[:], sk.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize+mldsa44.PublicKeySize:])
 
-	//fmt.Println(len(sk.key), len(sk1), len(sk.key[ed25519.PrivateKeySize:ed25519.PrivateKeySize+mldsa44.PrivateKeySize]), len(sk.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize:]))
-
 	edPriKey, err = ed25519.UnmarshalPrivateKey(sk1)
 	if err != nil {
 		return nil, nil, nil, err
