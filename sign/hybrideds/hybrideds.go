@@ -267,30 +267,20 @@ func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error)
 		return nil, nil, err
 	}
 
-	pubKeyBytes := append(eddsaPubKey[:], mldsaPubKey.Bytes()...)
-	pubKeyBytes = append(pubKeyBytes, slhdsaPubKeyBytes...)
-
-	if len(pubKeyBytes) != PublicKeySize {
-		return nil, nil, errors.New("invalid public key size")
-	}
-
-	priKeyBytes := append(eddsaPriKey[:], mlDsaPriKey.Bytes()...)
-	priKeyBytes = append(priKeyBytes, mldsaPubKey.Bytes()...)
-	priKeyBytes = append(priKeyBytes, slhdsaPriKeyBytes...)
-
-	if len(priKeyBytes) != PrivateKeySize {
-		return nil, nil, errors.New("invalid private key size")
-	}
-
 	pub = &PublicKey{
 		key: make([]byte, PublicKeySize),
 	}
+	copy(pub.key[:], eddsaPubKey)
+	copy(pub.key[ed25519.PublicKeySize:], mldsaPubKey.Bytes())
+	copy(pub.key[ed25519.PublicKeySize+mldsa44.PublicKeySize:], slhdsaPubKeyBytes)
+
 	priv = &PrivateKey{
 		key: make([]byte, PrivateKeySize),
 	}
-
-	copy(pub.key, pubKeyBytes)
-	copy(priv.key, priKeyBytes)
+	copy(priv.key[:], eddsaPriKey)
+	copy(priv.key[ed25519.PrivateKeySize:], mlDsaPriKey.Bytes())
+	copy(priv.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize:], mldsaPubKey.Bytes())
+	copy(priv.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize+mldsa44.PublicKeySize:], slhdsaPriKeyBytes)
 
 	return pub, priv, nil
 }
