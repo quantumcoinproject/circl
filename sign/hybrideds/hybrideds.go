@@ -300,7 +300,7 @@ func NewKeyFromSeed(seed *[SeedSize]byte) (*PublicKey, *PrivateKey, error) {
 	return GenerateKey(seedBuff)
 }
 
-func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature [SigLength]byte, err error) {
+func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err error) {
 	if msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
 		return signature, errors.New("invalid message")
 	}
@@ -334,6 +334,7 @@ func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature [SigLength]by
 		return signature, errors.New("invalid signature length")
 	}
 
+	signature = make([]byte, SigLength)
 	signature[0] = DILITHIUM_ED25519_SPHINCS_FULL_ID
 	signature[1] = CRYPTO_MSG_LENGTH
 	copy(signature[2:], sig1)
@@ -344,8 +345,8 @@ func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature [SigLength]by
 	return signature, nil
 }
 
-func Verify(pk *PublicKey, msg []byte, signature [SigLength]byte) bool {
-	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
+func Verify(pk *PublicKey, msg []byte, signature []byte) bool {
+	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH || len(signature) != SigLength {
 		return false
 	}
 
@@ -388,7 +389,7 @@ func Verify(pk *PublicKey, msg []byte, signature [SigLength]byte) bool {
 	return true
 }
 
-func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature [CompactSigLength]byte, err error) {
+func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err error) {
 	if msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
 		return signature, errors.New("invalid message")
 	}
@@ -457,6 +458,7 @@ func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature [Compa
 		return signature, errors.New("invalid signature length")
 	}
 
+	signature = make([]byte, CompactSigLength)
 	signature[0] = DILITHIUM_ED25519_SPHINCS_COMPACT_ID
 	signature[1] = CRYPTO_MSG_LENGTH
 	copy(signature[2:], sig1)
@@ -467,8 +469,8 @@ func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature [Compa
 	return signature, nil
 }
 
-func VerifyCompact(pk *PublicKey, msg []byte, signature [CompactSigLength]byte) bool {
-	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
+func VerifyCompact(pk *PublicKey, msg []byte, signature []byte) bool {
+	if pk == nil || msg == nil || signature == nil || len(msg) != CRYPTO_MSG_LENGTH || len(signature) != CompactSigLength {
 		return false
 	}
 
