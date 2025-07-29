@@ -172,8 +172,16 @@ func TestSignVerifyBasic(t *testing.T) {
 		t.Fatalf("failed")
 	}
 
+	if len(signature) != SigLength {
+		t.Fatalf("failed")
+	}
+
 	if Verify(pubKey, msg[:], signature) == false {
 		t.Fatalf("verify failed")
+	}
+
+	if Verify(pubKey, msg[:], signature[1:]) == true {
+		t.Fatalf("verify passed unexpectedly")
 	}
 
 	//Message fuzz test
@@ -193,13 +201,13 @@ func TestSignVerifyBasic(t *testing.T) {
 	//Signature fuzz test
 	var signature2 [SigLength]byte
 	copy(signature2[:], signature[:])
-	if Verify(pubKey, msg[:], signature2) == false {
+	if Verify(pubKey, msg[:], signature2[:]) == false {
 		t.Fatalf("verify failed")
 	}
 	for i := 0; i < SigLength; i++ {
 		copy(signature2[:], signature[:])
 		signature2[i] = signature[i] + 1
-		if Verify(pubKey, msg[:], signature2) == true {
+		if Verify(pubKey, msg[:], signature2[:]) == true {
 			t.Fatalf("verify passed unexpectedly")
 		}
 	}
@@ -246,8 +254,16 @@ func TestSignVerifyCompactBasic(t *testing.T) {
 		t.Fatalf("failed")
 	}
 
+	if len(signature) != CompactSigLength {
+		t.Fatalf("failed")
+	}
+
 	if VerifyCompact(pubKey, msg[:], signature) == false {
 		t.Fatalf("verify failed")
+	}
+
+	if VerifyCompact(pubKey, msg[:], signature[1:]) == true {
+		t.Fatalf("verify passed unexpectedly")
 	}
 
 	//Message fuzz test
@@ -267,13 +283,13 @@ func TestSignVerifyCompactBasic(t *testing.T) {
 	//Signature fuzz test
 	var signature2 [CompactSigLength]byte
 	copy(signature2[:], signature[:])
-	if VerifyCompact(pubKey, msg[:], signature2) == false {
+	if VerifyCompact(pubKey, msg[:], signature2[:]) == false {
 		t.Fatalf("verify failed")
 	}
 	for i := 0; i < CompactSigLength; i++ {
 		copy(signature2[:], signature[:])
 		signature2[i] = signature[i] + 1
-		if VerifyCompact(pubKey, msg[:], signature2) == true {
+		if VerifyCompact(pubKey, msg[:], signature2[:]) == true {
 			fmt.Println(i, signature[i], signature2[i])
 			t.Fatalf("verify passed unexpectedly")
 		}
