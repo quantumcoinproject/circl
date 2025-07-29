@@ -344,11 +344,20 @@ func BenchmarkSign(b *testing.B) {
 	}
 }
 
-func BenchmarkVerify(b *testing.B) {
-	b.ResetTimer()
+func TestPerf(t *testing.T) {
+	if verifyFull() == false {
+		t.Fatalf("failed")
+	}
+	if verifyCompact() == false {
+		t.Fatalf("failed")
+	}
+}
+
+func verifyFull() bool {
 	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
 	if err != nil {
-		b.Fatalf("failed")
+		fmt.Println(err)
+		return false
 	}
 	var msg [CRYPTO_MSG_LENGTH]byte
 	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
@@ -358,16 +367,25 @@ func BenchmarkVerify(b *testing.B) {
 	signature, err := Sign(priKey, random, msg[:])
 	if err != nil {
 		fmt.Println(err)
-		b.Fatalf("failed")
+		return false
 	}
 
 	start := time.Now()
 	for i := 0; i <= BenchMarkIterations; i++ {
 		if Verify(pubKey, msg[:], signature) == false {
-			b.Fatalf("verify failed")
+			return false
 		}
 	}
-	fmt.Println("Elapsed", time.Since(start), "iterations", BenchMarkIterations)
+	duration := time.Since(start)
+	fmt.Println("verifyFull Elapsed", duration, "iterations", BenchMarkIterations, "avg time ms", float64(duration.Milliseconds())/float64(BenchMarkIterations))
+	return true
+}
+
+func BenchmarkVerify(b *testing.B) {
+	b.ResetTimer()
+	if verifyFull() == false {
+		b.Fatalf("failed")
+	}
 }
 
 func BenchmarkSignCompact(b *testing.B) {
@@ -399,11 +417,11 @@ func BenchmarkSignCompact(b *testing.B) {
 	}
 }
 
-func BenchmarkVerifyCompact(b *testing.B) {
-	b.ResetTimer()
+func verifyCompact() bool {
 	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
 	if err != nil {
-		b.Fatalf("failed")
+		fmt.Println(err)
+		return false
 	}
 	var msg [CRYPTO_MSG_LENGTH]byte
 	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
@@ -413,14 +431,23 @@ func BenchmarkVerifyCompact(b *testing.B) {
 	signature, err := SignCompact(priKey, random, msg[:])
 	if err != nil {
 		fmt.Println(err)
-		b.Fatalf("failed")
+		return false
 	}
 
 	start := time.Now()
 	for i := 0; i <= BenchMarkIterations; i++ {
 		if VerifyCompact(pubKey, msg[:], signature) == false {
-			b.Fatalf("verify failed")
+			return false
 		}
 	}
-	fmt.Println("Elapsed", time.Since(start), "iterations", BenchMarkIterations)
+	duration := time.Since(start)
+	fmt.Println("verifyCompact Elapsed", duration, "iterations", BenchMarkIterations, "avg time ms", float64(duration.Milliseconds())/float64(BenchMarkIterations))
+	return true
+}
+
+func BenchmarkVerifyCompact(b *testing.B) {
+	b.ResetTimer()
+	if verifyCompact() == false {
+		b.Fatalf("failed")
+	}
 }
