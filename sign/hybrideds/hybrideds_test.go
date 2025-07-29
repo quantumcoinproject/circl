@@ -74,6 +74,14 @@ func TestGetKeys(t *testing.T) {
 		t.Fatalf("failed")
 	}
 
+	priKeyTemp, err := UnmarshalPrivateKey(priKeyBytes)
+	if err != nil {
+		t.Fatalf("failed")
+	}
+	if bytes.Equal(priKeyTemp.key, priKeyBytes) == false {
+		t.Fatalf("failed")
+	}
+
 	pri1, pri2, pri3, err := priKey.getPrivateKeys()
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -160,6 +168,7 @@ func TestSignVerifyBasic(t *testing.T) {
 		t.Fatalf("verify failed")
 	}
 
+	//Message fuzz test
 	var msg2 [CRYPTO_MSG_LENGTH]byte
 	copy(msg2[:], msg[:])
 	if Verify(pubKey, msg[:], signature) == false {
@@ -173,6 +182,7 @@ func TestSignVerifyBasic(t *testing.T) {
 		}
 	}
 
+	//Signature fuzz test
 	var signature2 [SigLength]byte
 	copy(signature2[:], signature[:])
 	if Verify(pubKey, msg[:], signature2) == false {
@@ -182,7 +192,31 @@ func TestSignVerifyBasic(t *testing.T) {
 		copy(signature2[:], signature[:])
 		signature2[i] = signature[i] + 1
 		if Verify(pubKey, msg[:], signature2) == true {
-			fmt.Println(i, signature[i], signature2[i])
+			t.Fatalf("verify passed unexpectedly")
+		}
+	}
+
+	//public key fuzz test
+	var publicFuzzBytes [PublicKeySize]byte
+	copy(publicFuzzBytes[:], pubKey.key)
+	var publicKeyFuzz *PublicKey
+	publicKeyFuzz, err = UnmarshalPublicKey(publicFuzzBytes[:])
+	if err != nil {
+		t.Fatalf("failed")
+	}
+
+	if Verify(publicKeyFuzz, msg[:], signature) == false {
+		t.Fatalf("verify failed")
+	}
+	for i := 0; i < PublicKeySize; i++ {
+		copy(publicFuzzBytes[:], pubKey.key)
+		publicFuzzBytes[i] = publicFuzzBytes[i] + 1
+		publicKeyFuzz, err = UnmarshalPublicKey(publicFuzzBytes[:])
+		if err != nil {
+			t.Fatalf("failed")
+		}
+
+		if Verify(publicKeyFuzz, msg[:], signature) == true {
 			t.Fatalf("verify passed unexpectedly")
 		}
 	}
@@ -209,6 +243,7 @@ func TestSignVerifyCompactBasic(t *testing.T) {
 		t.Fatalf("verify failed")
 	}
 
+	//Message fuzz test
 	var msg2 [CRYPTO_MSG_LENGTH]byte
 	copy(msg2[:], msg[:])
 	if VerifyCompact(pubKey, msg[:], signature) == false {
@@ -222,6 +257,7 @@ func TestSignVerifyCompactBasic(t *testing.T) {
 		}
 	}
 
+	//Signature fuzz test
 	var signature2 [CompactSigLength]byte
 	copy(signature2[:], signature[:])
 	if VerifyCompact(pubKey, msg[:], signature2) == false {
@@ -232,6 +268,31 @@ func TestSignVerifyCompactBasic(t *testing.T) {
 		signature2[i] = signature[i] + 1
 		if VerifyCompact(pubKey, msg[:], signature2) == true {
 			fmt.Println(i, signature[i], signature2[i])
+			t.Fatalf("verify passed unexpectedly")
+		}
+	}
+
+	//public key fuzz test
+	var publicFuzzBytes [PublicKeySize]byte
+	copy(publicFuzzBytes[:], pubKey.key)
+	var publicKeyFuzz *PublicKey
+	publicKeyFuzz, err = UnmarshalPublicKey(publicFuzzBytes[:])
+	if err != nil {
+		t.Fatalf("failed")
+	}
+
+	if VerifyCompact(publicKeyFuzz, msg[:], signature) == false {
+		t.Fatalf("verify failed")
+	}
+	for i := 0; i < PublicKeySize; i++ {
+		copy(publicFuzzBytes[:], pubKey.key)
+		publicFuzzBytes[i] = publicFuzzBytes[i] + 1
+		publicKeyFuzz, err = UnmarshalPublicKey(publicFuzzBytes[:])
+		if err != nil {
+			t.Fatalf("failed")
+		}
+
+		if VerifyCompact(publicKeyFuzz, msg[:], signature) == true {
 			t.Fatalf("verify passed unexpectedly")
 		}
 	}

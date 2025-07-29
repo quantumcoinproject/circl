@@ -191,7 +191,7 @@ func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKe
 	return
 }
 
-func (sk *PrivateKey) getPublicKey() (edsPubKey *PublicKey, err error) {
+func (sk *PrivateKey) GetPublicKey() (edsPubKey *PublicKey, err error) {
 	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
 		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
@@ -412,7 +412,7 @@ func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature [Compa
 	}
 
 	//Get SLH DSA public key
-	pubKey, err := priv.getPublicKey()
+	pubKey, err := priv.GetPublicKey()
 	if err != nil {
 		return signature, err
 	}
