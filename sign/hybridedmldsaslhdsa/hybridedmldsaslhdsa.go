@@ -1,8 +1,7 @@
-package hybrideds
+package hybridedmldsaslhdsa
 
 import (
 	"bytes"
-	"crypto/sha3"
 	"errors"
 	"fmt"
 	"github.com/quantumcoinproject/circl/sign/ed25519"
@@ -17,49 +16,43 @@ Secret Key Length = 64 + 2560 + 1312 + 128 = 4064
 Layout of secret key:
 
 64 bytes                             2560 bytes             1312 bytes             128 bytes
-ed25519 secret key with public key | dilithium secret key | dilithium public key | sphincs secret key with public key
+ed25519 secret key with public key   | ml-dsa secret key    | ml-dsa public key    | slh-dsa secret key with public key
 
 The following signature length includes implementation output, in addition to actual algorithm output.
 
 Layout of Public Key
-==============================
+=====================
 32 bytes           | 1312 bytes            | 64 bytes
-ed25519 public key | dilithium public key  | sphincs public key
+ed25519 public key | ml-dsa public key     | slh-dsa public key
 
 
 Compact Signature
 ==================
 ==================
-The compact signature scheme does not sign the message using sphincs+, but only using ed25519 and dilithium. During any emergency event, such as if both ed25519 and dilithium are broken or potential attacks found,
-the SPHINCS+ key can be used to prove authenticity of signatures signed earlier or enabled for newer signatures with the same key pair.
+The compact signature scheme does not sign the message using slh-dsa, but only using ed25519 and ml-dsa. During any emergency event, such as if both ed25519 and ml-dsa are broken or potential attacks found,
+the slh-dsa key can be used to prove authenticity of signatures signed earlier or enabled for newer signatures with the same key pair.
 
-In the compact signature mode, a new message digest is created from the original message digest and then hashed using sha3-512. This new message is signed by ed25519 and dilithium
+In the compact signature mode, (signature id + slh-dsa public key) is used as the context string for ml-dsa signing. Randomized version is used for signing using ml-dsa.
 
-Hybrid Signature Message (compact mode)
-=========================================
-
-40 bytes      | {0 to 64 bytes}  | 64 bytes
-random nonce  | original message | sphincs public key
-
-hybrid-message-hash = SHA3-512(compact-mode-message)
-
-Hybrid Signature Length (compact mode) = 1 + 1 + 64 + 2420 + 40 + {1 to 64}
+Hybrid Signature Length (compact mode) = 1 + 1 + 64 + 2420 + {1 to 64}
 =======================================================================================================================
 Layout of signature:
 
-1 byte                  | 1 byte            | 64 bytes          | 2420 bytres         | 40 bytes     | {1 to 64 bytes}
-signature id (always 1) | length of message | ed25519 signature | dilithium signature | random nonce | original message
+1 byte                  | 1 byte            | 64 bytes          | 2420 bytes       | {1 to 64 bytes}
+signature id (always 3) | length of message | ed25519 signature | ml-dsa signature | original message
 
 Full Signature
 ==================
 ==================
+
+Unlike the contact mode, the full signature mode uses all the three schemes to sign. Randomized version is used for signing using ml-dsa and slh-dsa. The signature id is used as the context string for ml-dsa and slh-dsa.
 
 Hybrid Signature Length (full, used during breakglass) = 1 + 1 + 64 + {1 to 64} + 2420 + 49856
 =======================================================================================================================
 Layout of signature:
 
 1 byte                  | 1 byte            | 64 bytes          | {1 to 64 bytes}   | 2420 bytes          | 49856
-signature id (always 2) | length of message | ed25519 signature | original message  | dilithium signature | sphincs signature
+signature id (always 4) | length of message | ed25519 signature | original message  | ml-dsa signature    | slh-dsa signature
 
 Message is variable length, between 1 to 64 bytes
 */
@@ -70,21 +63,17 @@ const (
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
 	PrivateKeySize       = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
 
-	SeedSizeSlhDsda                      = 96
-	SeedSize                             = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
-	CRYPTO_MSG_LENGTH                    = 32
-	DILITHIUM_ED25519_SPHINCS_COMPACT_ID = byte(1)
-	DILITHIUM_ED25519_SPHINCS_FULL_ID    = byte(2)
+	SeedSizeSlhDsda                 = 96
+	SeedSize                        = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
+	CRYPTO_MSG_LENGTH               = 32
+	ED25519_MLDSA_SLHDSA_COMPACT_ID = byte(3)
+	ED25519_MLDSA_SLHDSA_FULL_ID    = byte(4)
 
-	ED25519_SIG_LENGTH      = 64
-	MLDSA44_SIG_LENGTH      = 2420
-	SLHDSA_SIG_LENGTH       = 49856
-	MLDSA44_SIG_RAND_LENGTH = 32
+	ED25519_SIG_LENGTH = 64
+	SLHDSA_SIG_LENGTH  = 49856
 
-	NonceSize = 40
-
-	CompactSigLength = 1 + 1 + ED25519_SIG_LENGTH + MLDSA44_SIG_LENGTH + NonceSize + CRYPTO_MSG_LENGTH
-	SigLength        = 1 + 1 + ED25519_SIG_LENGTH + CRYPTO_MSG_LENGTH + MLDSA44_SIG_LENGTH + SLHDSA_SIG_LENGTH
+	CompactSigLength = 1 + 1 + ED25519_SIG_LENGTH + mldsa44.SignatureSize + CRYPTO_MSG_LENGTH
+	SigLength        = 1 + 1 + ED25519_SIG_LENGTH + CRYPTO_MSG_LENGTH + mldsa44.SignatureSize + SLHDSA_SIG_LENGTH
 )
 
 type PublicKey struct {
@@ -286,34 +275,35 @@ func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err e
 		return signature, err
 	}
 
-	var mldsaRnd [MLDSA44_SIG_RAND_LENGTH]byte
-	_, err = rand.Read(mldsaRnd[:])
-	if err != nil {
-		return signature, err
-	}
-
 	sig1 := ed25519.Sign(*key1, msg)
-	sig2 := mldsa44.SignNoContext(key2, msg, mldsaRnd)
-	sig3, err := slhdsa.SignRandomizedNoContext(key3, rand, msg)
+	context := []byte{ED25519_MLDSA_SLHDSA_FULL_ID}
+
+	var sig2 [mldsa44.SignatureSize]byte
+	err = mldsa44.Sign(key2, msg, context, rand, sig2[:])
+	if err != nil {
+		return nil, err
+	}
+
+	sig3, err := slhdsa.SignRandomized(key3, rand, slhdsa.NewMessage(msg), context)
 
 	if err != nil {
 		return signature, err
 	}
 
-	if sig1 == nil || sig2 == nil || sig3 == nil {
+	if sig1 == nil || sig3 == nil {
 		return signature, errors.New("invalid signature")
 	}
 
-	if len(sig1) != ED25519_SIG_LENGTH || len(sig2) != MLDSA44_SIG_LENGTH || len(sig3) != SLHDSA_SIG_LENGTH {
+	if len(sig1) != ED25519_SIG_LENGTH || len(sig3) != SLHDSA_SIG_LENGTH {
 		return signature, errors.New("invalid signature length")
 	}
 
 	signature = make([]byte, SigLength)
-	signature[0] = DILITHIUM_ED25519_SPHINCS_FULL_ID
+	signature[0] = ED25519_MLDSA_SLHDSA_FULL_ID
 	signature[1] = CRYPTO_MSG_LENGTH
 	copy(signature[2:], sig1)
 	copy(signature[2+len(sig1):], msg)
-	copy(signature[2+len(sig1)+len(msg):], sig2)
+	copy(signature[2+len(sig1)+len(msg):], sig2[:])
 	copy(signature[2+len(sig1)+len(msg)+len(sig2):], sig3)
 
 	return signature, nil
@@ -324,7 +314,7 @@ func Verify(pk *PublicKey, msg []byte, signature []byte) bool {
 		return false
 	}
 
-	if signature[0] != DILITHIUM_ED25519_SPHINCS_FULL_ID {
+	if signature[0] != ED25519_MLDSA_SLHDSA_FULL_ID {
 		return false
 	}
 
@@ -350,13 +340,14 @@ func Verify(pk *PublicKey, msg []byte, signature []byte) bool {
 		return false
 	}
 
-	sig2 := signature[2+ED25519_SIG_LENGTH+len(msg) : 2+ED25519_SIG_LENGTH+len(msg)+MLDSA44_SIG_LENGTH]
-	if mldsa44.VerifyNoContext(key2, msg, sig2) == false {
+	context := []byte{ED25519_MLDSA_SLHDSA_FULL_ID}
+	sig2 := signature[2+ED25519_SIG_LENGTH+len(msg) : 2+ED25519_SIG_LENGTH+len(msg)+mldsa44.SignatureSize]
+	if mldsa44.Verify(key2, msg, context, sig2) == false {
 		return false
 	}
 
-	sig3 := signature[2+ED25519_SIG_LENGTH+len(msg)+MLDSA44_SIG_LENGTH:]
-	if slhdsa.VerifyNoContext(key3, msg, sig3) == false {
+	sig3 := signature[2+ED25519_SIG_LENGTH+len(msg)+mldsa44.SignatureSize:]
+	if slhdsa.Verify(key3, slhdsa.NewMessage(msg), sig3, context) == false {
 		return false
 	}
 
@@ -375,15 +366,6 @@ func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte
 		return signature, err
 	}
 
-	var nonce [NonceSize]byte
-	bytesRead, err := rand.Read(nonce[:])
-	if err != nil {
-		return signature, err
-	}
-	if bytesRead != NonceSize {
-		return signature, errors.New("invalid bytesRead nonce")
-	}
-
 	//Get SLH DSA public key
 	pubKey, err := priv.GetPublicKey()
 	if err != nil {
@@ -398,47 +380,33 @@ func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte
 		return signature, err
 	}
 
-	//Form hybrid msg
-	var hybridMsg [NonceSize + CRYPTO_MSG_LENGTH + SlhDsaPublicKeySize]byte
-	copy(hybridMsg[:], nonce[:])
-	copy(hybridMsg[NonceSize:], msg[:])
-	copy(hybridMsg[NonceSize+len(msg):], slhdsaPubKeyBytes[:])
+	sig1 := ed25519.Sign(*key1, msg)
 
-	//Form hybrid msg hash
-	hasher := sha3.New512()
-	_, err = hasher.Write(hybridMsg[:])
+	var sig2 [mldsa44.SignatureSize]byte
+
+	context := make([]byte, 1+len(slhdsaPubKeyBytes))
+	context[0] = ED25519_MLDSA_SLHDSA_COMPACT_ID
+	copy(context[1:], slhdsaPubKeyBytes)
+
+	err = mldsa44.Sign(key2, msg, context, rand, sig2[:])
 	if err != nil {
-		return signature, err
-	}
-	hybridMsgHash := hasher.Sum(nil)
-
-	var mldsaRnd [MLDSA44_SIG_RAND_LENGTH]byte
-	bytesRead, err = rand.Read(mldsaRnd[:])
-	if err != nil {
-		return signature, err
-	}
-	if bytesRead != MLDSA44_SIG_RAND_LENGTH {
-		return signature, errors.New("invalid bytesRead nonce")
+		return nil, err
 	}
 
-	sig1 := ed25519.Sign(*key1, hybridMsgHash)
-	sig2 := mldsa44.SignNoContext(key2, hybridMsgHash, mldsaRnd)
-
-	if sig1 == nil || sig2 == nil {
+	if sig1 == nil {
 		return signature, errors.New("invalid signature")
 	}
 
-	if len(sig1) != ED25519_SIG_LENGTH || len(sig2) != MLDSA44_SIG_LENGTH {
+	if len(sig1) != ED25519_SIG_LENGTH {
 		return signature, errors.New("invalid signature length")
 	}
 
 	signature = make([]byte, CompactSigLength)
-	signature[0] = DILITHIUM_ED25519_SPHINCS_COMPACT_ID
+	signature[0] = ED25519_MLDSA_SLHDSA_COMPACT_ID
 	signature[1] = CRYPTO_MSG_LENGTH
 	copy(signature[2:], sig1)
-	copy(signature[2+len(sig1):], sig2)
-	copy(signature[2+len(sig1)+len(sig2):], nonce[:])
-	copy(signature[2+len(sig1)+len(sig2)+len(nonce):], msg)
+	copy(signature[2+len(sig1):], sig2[:])
+	copy(signature[2+len(sig1)+len(sig2):], msg)
 
 	return signature, nil
 }
@@ -448,7 +416,7 @@ func VerifyCompact(pk *PublicKey, msg []byte, signature []byte) bool {
 		return false
 	}
 
-	if signature[0] != DILITHIUM_ED25519_SPHINCS_COMPACT_ID {
+	if signature[0] != ED25519_MLDSA_SLHDSA_COMPACT_ID {
 		return false
 	}
 
@@ -457,7 +425,7 @@ func VerifyCompact(pk *PublicKey, msg []byte, signature []byte) bool {
 	}
 
 	//first verify msg from signature
-	if bytes.Equal(signature[2+ED25519_SIG_LENGTH+MLDSA44_SIG_LENGTH+NonceSize:2+ED25519_SIG_LENGTH+MLDSA44_SIG_LENGTH+NonceSize+CRYPTO_MSG_LENGTH], msg) == false {
+	if bytes.Equal(signature[2+ED25519_SIG_LENGTH+mldsa44.SignatureSize:2+ED25519_SIG_LENGTH+mldsa44.SignatureSize+CRYPTO_MSG_LENGTH], msg) == false {
 		return false
 	}
 
@@ -473,27 +441,17 @@ func VerifyCompact(pk *PublicKey, msg []byte, signature []byte) bool {
 		return false
 	}
 
-	//Form hybrid msg
-	var hybridMsg [NonceSize + CRYPTO_MSG_LENGTH + SlhDsaPublicKeySize]byte
-	copy(hybridMsg[:], signature[2+ED25519_SIG_LENGTH+MLDSA44_SIG_LENGTH:2+ED25519_SIG_LENGTH+MLDSA44_SIG_LENGTH+NonceSize]) //nonce
-	copy(hybridMsg[NonceSize:], msg[:])
-	copy(hybridMsg[NonceSize+len(msg):], slhdsaPubKeyBytes[:])
-
-	//Form hybrid msg hash
-	hasher := sha3.New512()
-	_, err = hasher.Write(hybridMsg[:])
-	if err != nil {
-		return false
-	}
-	hybridMsgHash := hasher.Sum(nil)
-
 	sig1 := signature[2 : 2+ED25519_SIG_LENGTH]
-	if ed25519.Verify(*key1, hybridMsgHash, sig1) == false {
+	if ed25519.Verify(*key1, msg, sig1) == false {
 		return false
 	}
 
-	sig2 := signature[2+ED25519_SIG_LENGTH : 2+ED25519_SIG_LENGTH+MLDSA44_SIG_LENGTH]
-	if mldsa44.VerifyNoContext(key2, hybridMsgHash, sig2) == false {
+	context := make([]byte, 1+len(slhdsaPubKeyBytes))
+	context[0] = ED25519_MLDSA_SLHDSA_COMPACT_ID
+	copy(context[1:], slhdsaPubKeyBytes)
+
+	sig2 := signature[2+ED25519_SIG_LENGTH : 2+ED25519_SIG_LENGTH+mldsa44.SignatureSize]
+	if mldsa44.Verify(key2, msg, context, sig2) == false {
 		return false
 	}
 
