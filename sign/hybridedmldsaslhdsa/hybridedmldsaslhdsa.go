@@ -32,7 +32,7 @@ Compact Signature
 The compact signature scheme does not sign the message using slh-dsa, but only using ed25519 and ml-dsa. During any emergency event, such as if both ed25519 and ml-dsa are broken or potential attacks found,
 the slh-dsa key can be used to prove authenticity of signatures signed earlier or enabled for newer signatures with the same key pair.
 
-In the compact signature mode, the slh-dsa public key is used as the context string for ml-dsa signing. Randomized version is used for signing using ml-dsa.
+In the compact signature mode, (signature id + slh-dsa public key) is used as the context string for ml-dsa signing. Randomized version is used for signing using ml-dsa.
 
 Hybrid Signature Length (compact mode) = 1 + 1 + 64 + 2420 + {1 to 64}
 =======================================================================================================================
@@ -45,7 +45,7 @@ Full Signature
 ==================
 ==================
 
-Unlike the contact mode, the full signature mode uses all the three schemes to sign. Randomized version is used for signing using ml-dsa and slh-dsa. Empty context string is used for ml-dsa and slh-dsa.
+Unlike the contact mode, the full signature mode uses all the three schemes to sign. Randomized version is used for signing using ml-dsa and slh-dsa. The signature id is used as the context string for ml-dsa and slh-dsa.
 
 Hybrid Signature Length (full, used during breakglass) = 1 + 1 + 64 + {1 to 64} + 2420 + 49856
 =======================================================================================================================
@@ -276,13 +276,15 @@ func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err e
 	}
 
 	sig1 := ed25519.Sign(*key1, msg)
+	context := []byte{ED25519_MLDSA_SLHDSA_FULL_ID}
 
 	var sig2 [mldsa44.SignatureSize]byte
-	err = mldsa44.Sign(key2, msg, nil, rand, sig2[:])
+	err = mldsa44.Sign(key2, msg, context, rand, sig2[:])
 	if err != nil {
 		return nil, err
 	}
-	sig3, err := slhdsa.SignRandomizedNoContext(key3, rand, msg)
+
+	sig3, err := slhdsa.SignRandomized(key3, rand, slhdsa.NewMessage(msg), context)
 
 	if err != nil {
 		return signature, err
@@ -338,13 +340,14 @@ func Verify(pk *PublicKey, msg []byte, signature []byte) bool {
 		return false
 	}
 
+	context := []byte{ED25519_MLDSA_SLHDSA_FULL_ID}
 	sig2 := signature[2+ED25519_SIG_LENGTH+len(msg) : 2+ED25519_SIG_LENGTH+len(msg)+mldsa44.SignatureSize]
-	if mldsa44.Verify(key2, msg, nil, sig2) == false {
+	if mldsa44.Verify(key2, msg, context, sig2) == false {
 		return false
 	}
 
 	sig3 := signature[2+ED25519_SIG_LENGTH+len(msg)+mldsa44.SignatureSize:]
-	if slhdsa.VerifyNoContext(key3, msg, sig3) == false {
+	if slhdsa.Verify(key3, slhdsa.NewMessage(msg), sig3, context) == false {
 		return false
 	}
 
@@ -381,7 +384,11 @@ func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte
 
 	var sig2 [mldsa44.SignatureSize]byte
 
-	err = mldsa44.Sign(key2, msg, slhdsaPubKeyBytes, rand, sig2[:])
+	context := make([]byte, 1+len(slhdsaPubKeyBytes))
+	context[0] = ED25519_MLDSA_SLHDSA_COMPACT_ID
+	copy(context[1:], slhdsaPubKeyBytes)
+
+	err = mldsa44.Sign(key2, msg, context, rand, sig2[:])
 	if err != nil {
 		return nil, err
 	}
@@ -439,8 +446,12 @@ func VerifyCompact(pk *PublicKey, msg []byte, signature []byte) bool {
 		return false
 	}
 
+	context := make([]byte, 1+len(slhdsaPubKeyBytes))
+	context[0] = ED25519_MLDSA_SLHDSA_COMPACT_ID
+	copy(context[1:], slhdsaPubKeyBytes)
+
 	sig2 := signature[2+ED25519_SIG_LENGTH : 2+ED25519_SIG_LENGTH+mldsa44.SignatureSize]
-	if mldsa44.Verify(key2, msg, slhdsaPubKeyBytes, sig2) == false {
+	if mldsa44.Verify(key2, msg, context, sig2) == false {
 		return false
 	}
 
