@@ -84,6 +84,34 @@ func SignTo(sk *PrivateKey, msg, ctx []byte, randomized bool, sig []byte) error 
 	return nil
 }
 
+func Sign(sk *PrivateKey, msg, ctx []byte, random io.Reader, sig []byte) error {
+	var rnd [32]byte
+	_, err := random.Read(rnd[:])
+	if err != nil {
+		return err
+	}
+
+	if ctx != nil && len(ctx) > 255 {
+		return sign.ErrContextTooLong
+	}
+
+	internal.SignTo(
+		(*internal.PrivateKey)(sk),
+		func(w io.Writer) {
+			_, _ = w.Write([]byte{0})
+			_, _ = w.Write([]byte{byte(len(ctx))})
+
+			if ctx != nil {
+				_, _ = w.Write(ctx)
+			}
+			w.Write(msg)
+		},
+		rnd,
+		sig,
+	)
+	return nil
+}
+
 // Do not use. Implements ML-DSA.Sign_internal used for compatibility tests.
 func (sk *PrivateKey) unsafeSignInternal(msg []byte, rnd [32]byte) []byte {
 	var ret [SignatureSize]byte
@@ -137,7 +165,7 @@ func VerifyNoContext(pk *PublicKey, msg, sig []byte) bool {
 // ctx is the optional context string. Fails if ctx is larger than 255 bytes.
 // A nil context string is equivalent to an empty context string.
 func Verify(pk *PublicKey, msg, ctx, sig []byte) bool {
-	if len(ctx) > 255 {
+	if ctx != nil && len(ctx) > 255 {
 		return false
 	}
 	return internal.Verify(
