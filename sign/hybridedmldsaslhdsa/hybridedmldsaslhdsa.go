@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/quantumcoinproject/circl/sign/ed25519"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44"
 	"github.com/quantumcoinproject/circl/sign/slhdsa"
-	"io"
 )
 
 /*
@@ -168,9 +169,9 @@ func (sk *PrivateKey) GetPublicKey() (edsPubKey *PublicKey, err error) {
 	}
 
 	pubKeyBytes := make([]byte, PublicKeySize)
-	copy(pubKeyBytes, sk.key[32:64])
-	copy(pubKeyBytes[ed25519.PublicKeySize:], sk.key[64+2560:64+2560+1312])
-	copy(pubKeyBytes[ed25519.PublicKeySize+mldsa44.PublicKeySize:], sk.key[64+2560+1312+64:])
+	copy(pubKeyBytes, sk.key[(ed25519.PrivateKeySize-ed25519.PublicKeySize):ed25519.PrivateKeySize])
+	copy(pubKeyBytes[ed25519.PublicKeySize:], sk.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize:ed25519.PrivateKeySize+mldsa44.PrivateKeySize+mldsa44.PublicKeySize])
+	copy(pubKeyBytes[ed25519.PublicKeySize+mldsa44.PublicKeySize:], sk.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize+mldsa44.PublicKeySize+(SlhDsaPrivateKeySize-SlhDsaPublicKeySize):])
 
 	edsPubKey = &PublicKey{
 		key: make([]byte, PublicKeySize),
