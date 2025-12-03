@@ -8,6 +8,7 @@ import (
 	cryptoRand "crypto/rand"
 	"encoding/asn1"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/quantumcoinproject/circl/sign"
@@ -63,6 +64,34 @@ func SignTo(sk *PrivateKey, msg, ctx []byte, randomized bool, sig []byte) error 
 	}
 
 	if len(ctx) > 255 {
+		return sign.ErrContextTooLong
+	}
+
+	internal.SignTo(
+		(*internal.PrivateKey)(sk),
+		func(w io.Writer) {
+			_, _ = w.Write([]byte{0})
+			_, _ = w.Write([]byte{byte(len(ctx))})
+
+			if ctx != nil {
+				_, _ = w.Write(ctx)
+			}
+			w.Write(msg)
+		},
+		rnd,
+		sig,
+	)
+	return nil
+}
+
+func Sign(sk *PrivateKey, msg, ctx []byte, random io.Reader, sig []byte) error {
+	var rnd [32]byte
+	_, err := random.Read(rnd[:])
+	if err != nil {
+		return err
+	}
+
+	if ctx != nil && len(ctx) > 255 {
 		return sign.ErrContextTooLong
 	}
 
@@ -218,6 +247,34 @@ func (sk *PrivateKey) UnmarshalBinary(data []byte) error {
 	copy(buf[:], data)
 	sk.Unpack(&buf)
 	return nil
+}
+
+// Unpacks the public key from data.
+func UnmarshalPublicKey(data []byte) (*PublicKey, error) {
+	if len(data) != PublicKeySize {
+		return nil, errors.New(fmt.Sprintf("packed public key must be of %d bytes", PublicKeySize))
+	}
+	var pk PublicKey
+	err := pk.UnmarshalBinary(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pk, nil
+}
+
+// Unpacks the private key from data.
+func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
+	if len(data) != PrivateKeySize {
+		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
+	}
+	var sk PrivateKey
+	err := sk.UnmarshalBinary(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sk, nil
 }
 
 // Sign signs the given message.
