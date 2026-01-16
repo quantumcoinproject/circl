@@ -5,10 +5,11 @@ import (
 	"crypto/sha3"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/quantumcoinproject/circl/sign/ed25519"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44"
 	"github.com/quantumcoinproject/circl/sign/slhdsa"
-	"io"
 )
 
 /*
@@ -147,7 +148,7 @@ func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKe
 	copy(sk1[:], sk.key[:ed25519.PrivateKeySize])
 
 	sk2 := make([]byte, mldsa44.PrivateKeySize)
-	copy(sk2[:], sk.key[ed25519.PrivateKeySize:ed25519.PrivateKeySize+mldsa44.PrivateKeySize+mldsa44.PublicKeySize])
+	copy(sk2[:], sk.key[ed25519.PrivateKeySize:ed25519.PrivateKeySize+mldsa44.PrivateKeySize])
 
 	sk3 := make([]byte, SlhDsaPrivateKeySize)
 	copy(sk3[:], sk.key[ed25519.PrivateKeySize+mldsa44.PrivateKeySize+mldsa44.PublicKeySize:])
