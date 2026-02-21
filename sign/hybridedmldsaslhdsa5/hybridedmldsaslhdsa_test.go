@@ -315,6 +315,70 @@ func TestSignVerifyBasic(t *testing.T) {
 	}
 }
 
+func TestSignVerifyBitflip(t *testing.T) {
+	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
+	if err != nil {
+		t.Fatalf("failed")
+	}
+	var msg [CRYPTO_MSG_LENGTH]byte
+	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
+		msg[i] = i
+	}
+	random := rand.Reader
+	signature, err := Sign(priKey, random, msg[:])
+	if err != nil {
+		fmt.Println(err)
+		t.Fatalf("failed")
+	}
+
+	if Verify(pubKey, msg[:], signature) == false {
+		t.Fatalf("verify failed")
+	}
+
+	// Message bitflip fuzz test
+	fmt.Println("TestSignVerifyBitflip: starting message bitflip fuzz test")
+	var msg2 [CRYPTO_MSG_LENGTH]byte
+	for i := 0; i < CRYPTO_MSG_LENGTH; i++ {
+		for bit := 0; bit < 8; bit++ {
+			copy(msg2[:], msg[:])
+			msg2[i] ^= 1 << uint(bit)
+			if Verify(pubKey, msg2[:], signature) == true {
+				t.Fatalf("verify passed unexpectedly on message bitflip byte %d bit %d", i, bit)
+			}
+		}
+	}
+
+	// Signature bitflip fuzz test
+	fmt.Println("TestSignVerifyBitflip: starting signature bitflip fuzz test")
+	var signature2 [SigLength]byte
+	for i := 0; i < SigLength; i++ {
+		for bit := 0; bit < 8; bit++ {
+			copy(signature2[:], signature[:])
+			signature2[i] ^= 1 << uint(bit)
+			if Verify(pubKey, msg[:], signature2[:]) == true {
+				t.Fatalf("verify passed unexpectedly on signature bitflip byte %d bit %d", i, bit)
+			}
+		}
+	}
+
+	// Public key bitflip fuzz test
+	fmt.Println("TestSignVerifyBitflip: starting public key bitflip fuzz test")
+	var publicFuzzBytes [PublicKeySize]byte
+	for i := 0; i < PublicKeySize; i++ {
+		for bit := 0; bit < 8; bit++ {
+			copy(publicFuzzBytes[:], pubKey.key)
+			publicFuzzBytes[i] ^= 1 << uint(bit)
+			publicKeyFuzz, err := UnmarshalPublicKey(publicFuzzBytes[:])
+			if err != nil {
+				t.Fatalf("failed to unmarshal public key on bitflip byte %d bit %d", i, bit)
+			}
+			if Verify(publicKeyFuzz, msg[:], signature) == true {
+				t.Fatalf("verify passed unexpectedly on pubkey bitflip byte %d bit %d", i, bit)
+			}
+		}
+	}
+}
+
 func BenchmarkKeyGen(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < BenchMarkIterations; i++ {
