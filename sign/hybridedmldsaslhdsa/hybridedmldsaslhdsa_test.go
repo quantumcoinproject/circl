@@ -45,10 +45,12 @@ func TestGenKeyRandBehaviour(t *testing.T) {
 		t.Fatalf("failed to read seed2: %v", err)
 	}
 
-	for i := ed25519.SeedSize; i < len(seed2); i++ {
-		if seed2[i] != byte(i+1) {
+	index := 0
+	for i := ed25519.SeedSize; i < ed25519.SeedSize + mldsa44.SeedSize; i++ {
+		if seed2[index] != byte(i+1) {
 			t.Fatalf("failed")
 		}
+		index++
 	}
 
 	seed3a := make([]byte, 32)
@@ -56,10 +58,12 @@ func TestGenKeyRandBehaviour(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read seed3: %v", err)
 	}
-	for i := ed25519.SeedSize + mldsa44.SeedSize; i < len(seed3a); i++ {
-		if seed3a[i] != byte(i+1) {
+	index = 0
+	for i := ed25519.SeedSize + mldsa44.SeedSize; i < ed25519.SeedSize + mldsa44.SeedSize + len(seed3a); i++ {
+		if seed3a[index] != byte(i+1) {
 			t.Fatalf("failed")
 		}
+		index++
 	}
 
 	seed3b := make([]byte, 32)
@@ -67,21 +71,25 @@ func TestGenKeyRandBehaviour(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read seed3: %v", err)
 	}
-	for i := ed25519.SeedSize + mldsa44.SeedSize + 32; i < len(seed3b); i++ {
-		if seed3b[i] != byte(i+1) {
+	index = 0	
+	for i := ed25519.SeedSize + mldsa44.SeedSize + 32; i < ed25519.SeedSize + mldsa44.SeedSize + 32 + len(seed3b); i++ {
+		if seed3b[index] != byte(i+1) {
 			t.Fatalf("failed")
 		}
-	}
+		index++
+	}	
 
 	seed3c := make([]byte, 32)
 	_, err = rnd.Read(seed3c)
 	if err != nil {
 		t.Fatalf("failed to read seed3: %v", err)
 	}
-	for i := ed25519.SeedSize + mldsa44.SeedSize + 32 + 32; i < len(seed3c); i++ {
-		if seed3c[i] != byte(i+1) {
+	index = 0
+	for i := ed25519.SeedSize + mldsa44.SeedSize + 32 + 32; i < ed25519.SeedSize + mldsa44.SeedSize + 32 + 32 + len(seed3c); i++ {
+		if seed3c[index] != byte(i+1) {
 			t.Fatalf("failed")
 		}
+		index++
 	}
 
 }

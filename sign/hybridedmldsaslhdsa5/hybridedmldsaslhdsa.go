@@ -12,6 +12,12 @@ import (
 )
 
 /*
+This hybrid signature scheme is designed for use in blockchain protocols where
+the composite key pair is the signer's sole cryptographic identity. Individual
+component keys (Ed25519, ML-DSA-87, SLH-DSA) MUST NOT be reused in any other
+signing context -- whether standalone, in a different hybrid combination, or
+across protocol boundaries.
+
 Secret Key Length = 64 + 4896 + 2592 + 128 = 7680
 ==================================================
 Layout of secret key:
@@ -46,8 +52,8 @@ const (
 	PublicKeySize        = ed25519.PublicKeySize + mldsa87.PublicKeySize + SlhDsaPublicKeySize
 	PrivateKeySize       = ed25519.PrivateKeySize + mldsa87.PrivateKeySize + mldsa87.PublicKeySize + SlhDsaPrivateKeySize
 
-	SeedSizeSlhDsda                = 96
-	SeedSize                       = ed25519.SeedSize + mldsa87.SeedSize + SeedSizeSlhDsda
+	SeedSizeSlhDsa                = 96
+	SeedSize                       = ed25519.SeedSize + mldsa87.SeedSize + SeedSizeSlhDsa
 	CRYPTO_MSG_LENGTH              = 32
 	ED25519_MLDSA5_SLHDSA5_FULL_ID = byte(5)
 
@@ -110,7 +116,7 @@ func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 }
 
 func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKey *mldsa87.PrivateKey, slhdsaPriKey *slhdsa.PrivateKey, err error) {
-	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
+	if len(sk.key) != PrivateKeySize {
 		return nil, nil, nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
 	sk1 := make([]byte, ed25519.PrivateKeySize)
@@ -144,7 +150,7 @@ func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKe
 }
 
 func (sk *PrivateKey) GetPublicKey() (edsPubKey *PublicKey, err error) {
-	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
+	if len(sk.key) != PrivateKeySize {
 		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
 
@@ -162,7 +168,7 @@ func (sk *PrivateKey) GetPublicKey() (edsPubKey *PublicKey, err error) {
 }
 
 func (pk *PublicKey) getPublicKeys() (edPubKey *ed25519.PublicKey, mldsaPubKey *mldsa87.PublicKey, slhdsaPubKey *slhdsa.PublicKey, err error) {
-	if len(pk.key) != PublicKeySize || len(pk.key) != PublicKeySize {
+	if len(pk.key) != PublicKeySize {
 		return nil, nil, nil, errors.New(fmt.Sprintf("packed public key must be of %d bytes", PublicKeySize))
 	}
 	sk1 := make([]byte, ed25519.PublicKeySize)
