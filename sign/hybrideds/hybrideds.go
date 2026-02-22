@@ -141,7 +141,7 @@ func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 }
 
 func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKey *mldsa44.PrivateKey, slhdsaPriKey *slhdsa.PrivateKey, err error) {
-	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
+	if sk.key == nil || len(sk.key) != PrivateKeySize {
 		return nil, nil, nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
 	sk1 := make([]byte, ed25519.PrivateKeySize)
@@ -175,7 +175,7 @@ func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKe
 }
 
 func (sk *PrivateKey) GetPublicKey() (edsPubKey *PublicKey, err error) {
-	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
+	if sk.key == nil || len(sk.key) != PrivateKeySize {
 		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
 
@@ -193,7 +193,7 @@ func (sk *PrivateKey) GetPublicKey() (edsPubKey *PublicKey, err error) {
 }
 
 func (pk *PublicKey) getPublicKeys() (edPubKey *ed25519.PublicKey, mldsaPubKey *mldsa44.PublicKey, slhdsaPubKey *slhdsa.PublicKey, err error) {
-	if len(pk.key) != PublicKeySize || len(pk.key) != PublicKeySize {
+	if pk.key == nil || len(pk.key) != PublicKeySize {
 		return nil, nil, nil, errors.New(fmt.Sprintf("packed public key must be of %d bytes", PublicKeySize))
 	}
 	sk1 := make([]byte, ed25519.PublicKeySize)
