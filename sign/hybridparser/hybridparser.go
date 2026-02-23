@@ -28,7 +28,7 @@
 //     https://doi.org/10.6028/NIST.FIPS.205
 //     Applies to hybrid schemes 3, 4, 5.
 //   - Ed25519 (EdDSA): FIPS 186-5, Digital Signature Standard (DSS).
-//     https://csrc.nist.gov/pubs/fips/186-5/ipd
+//     https://csrc.nist.gov/pubs/fips/186-5/final
 //     Applies to hybrid schemes 3, 4, 5.
 //
 //   The HybridEds package (SchemeID 1 and 2) uses Dilithium and SPHINCS+, which are
