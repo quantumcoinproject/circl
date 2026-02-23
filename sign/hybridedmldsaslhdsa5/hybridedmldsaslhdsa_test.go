@@ -44,11 +44,12 @@ func TestGenKeyRandBehaviour(t *testing.T) {
 	if _, err := io.ReadFull(rnd, seed2); err != nil {
 		t.Fatalf("failed to read seed2: %v", err)
 	}
-
-	for i := ed25519.SeedSize; i < len(seed2); i++ {
-		if seed2[i] != byte(i+1) {
+	index := 0
+	for i := ed25519.SeedSize; i < ed25519.SeedSize+len(seed2); i++ {
+		if seed2[index] != byte(i+1) {
 			t.Fatalf("failed")
 		}
+		index++
 	}
 
 	seed3a := make([]byte, 32)
@@ -56,10 +57,12 @@ func TestGenKeyRandBehaviour(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read seed3: %v", err)
 	}
-	for i := ed25519.SeedSize + mldsa87.SeedSize; i < len(seed3a); i++ {
-		if seed3a[i] != byte(i+1) {
+	index = 0
+	for i := ed25519.SeedSize + mldsa87.SeedSize; i < ed25519.SeedSize+mldsa87.SeedSize+len(seed3a); i++ {
+		if seed3a[index] != byte(i+1) {
 			t.Fatalf("failed")
 		}
+		index++
 	}
 
 	seed3b := make([]byte, 32)
@@ -67,10 +70,12 @@ func TestGenKeyRandBehaviour(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read seed3: %v", err)
 	}
-	for i := ed25519.SeedSize + mldsa87.SeedSize + 32; i < len(seed3b); i++ {
-		if seed3b[i] != byte(i+1) {
+	index = 0
+	for i := ed25519.SeedSize + mldsa87.SeedSize + 32; i < ed25519.SeedSize+mldsa87.SeedSize+32+len(seed3b); i++ {
+		if seed3b[index] != byte(i+1) {
 			t.Fatalf("failed")
 		}
+		index++
 	}
 
 	seed3c := make([]byte, 32)
@@ -78,10 +83,12 @@ func TestGenKeyRandBehaviour(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read seed3: %v", err)
 	}
-	for i := ed25519.SeedSize + mldsa87.SeedSize + 32 + 32; i < len(seed3c); i++ {
-		if seed3c[i] != byte(i+1) {
+	index = 0
+	for i := ed25519.SeedSize + mldsa87.SeedSize + 32 + 32; i < ed25519.SeedSize+mldsa87.SeedSize+32+32+len(seed3c); i++ {
+		if seed3c[index] != byte(i+1) {
 			t.Fatalf("failed")
 		}
+		index++
 	}
 
 }
@@ -164,7 +171,8 @@ func TestGetKeys(t *testing.T) {
 
 	pri1, pri2, pri3, err := priKey.getPrivateKeys()
 	if err != nil {
-		t.Fatalf(err.Error())
+		fmt.Println(err)
+		t.Fatalf("error")
 	}
 
 	if pri1 == nil || pri2 == nil || pri3 == nil {
@@ -179,7 +187,8 @@ func TestGetKeys(t *testing.T) {
 
 	pub1, pub2, pub3, err := pubKey.getPublicKeys()
 	if err != nil {
-		t.Fatalf(err.Error())
+		fmt.Println(err)
+		t.Fatalf("error")
 	}
 
 	if pub1 == nil || pub2 == nil || pub3 == nil {
@@ -309,6 +318,70 @@ func TestSignVerifyBasic(t *testing.T) {
 
 		if Verify(publicKeyFuzz, msg[:], signature) == true {
 			t.Fatalf("verify passed unexpectedly")
+		}
+	}
+}
+
+func TestSignVerifyBitflip(t *testing.T) {
+	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
+	if err != nil {
+		t.Fatalf("failed")
+	}
+	var msg [CRYPTO_MSG_LENGTH]byte
+	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
+		msg[i] = i
+	}
+	random := rand.Reader
+	signature, err := Sign(priKey, random, msg[:])
+	if err != nil {
+		fmt.Println(err)
+		t.Fatalf("failed")
+	}
+
+	if Verify(pubKey, msg[:], signature) == false {
+		t.Fatalf("verify failed")
+	}
+
+	// Message bitflip fuzz test
+	fmt.Println("TestSignVerifyBitflip: starting message bitflip fuzz test")
+	var msg2 [CRYPTO_MSG_LENGTH]byte
+	for i := 0; i < CRYPTO_MSG_LENGTH; i++ {
+		for bit := 0; bit < 8; bit++ {
+			copy(msg2[:], msg[:])
+			msg2[i] ^= 1 << uint(bit)
+			if Verify(pubKey, msg2[:], signature) == true {
+				t.Fatalf("verify passed unexpectedly on message bitflip byte %d bit %d", i, bit)
+			}
+		}
+	}
+
+	// Signature bitflip fuzz test
+	fmt.Println("TestSignVerifyBitflip: starting signature bitflip fuzz test")
+	var signature2 [SigLength]byte
+	for i := 0; i < SigLength; i++ {
+		for bit := 0; bit < 8; bit++ {
+			copy(signature2[:], signature[:])
+			signature2[i] ^= 1 << uint(bit)
+			if Verify(pubKey, msg[:], signature2[:]) == true {
+				t.Fatalf("verify passed unexpectedly on signature bitflip byte %d bit %d", i, bit)
+			}
+		}
+	}
+
+	// Public key bitflip fuzz test
+	fmt.Println("TestSignVerifyBitflip: starting public key bitflip fuzz test")
+	var publicFuzzBytes [PublicKeySize]byte
+	for i := 0; i < PublicKeySize; i++ {
+		for bit := 0; bit < 8; bit++ {
+			copy(publicFuzzBytes[:], pubKey.key)
+			publicFuzzBytes[i] ^= 1 << uint(bit)
+			publicKeyFuzz, err := UnmarshalPublicKey(publicFuzzBytes[:])
+			if err != nil {
+				t.Fatalf("failed to unmarshal public key on bitflip byte %d bit %d", i, bit)
+			}
+			if Verify(publicKeyFuzz, msg[:], signature) == true {
+				t.Fatalf("verify passed unexpectedly on pubkey bitflip byte %d bit %d", i, bit)
+			}
 		}
 	}
 }
