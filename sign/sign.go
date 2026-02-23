@@ -3,6 +3,9 @@
 // A register of schemes is available in the package
 //
 //	github.com/quantumcoinproject/circl/sign/schemes
+//
+// For parsing and verifying hybrid signatures (schemes 1–5), use the
+// hybridparser subpackage: github.com/quantumcoinproject/circl/sign/hybridparser
 package sign
 
 import (

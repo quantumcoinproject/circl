@@ -17,6 +17,29 @@ Curve Cryptography (ECC).
 
 🚨 This library is offered as-is, and without a guarantee. Therefore, it is expected that changes in the code, repository, and API occur in the future. We recommend to take caution before using this library in a production application since part of its content is experimental. All security issues must be reported, please notify us immediately following the instructions given in our [Security Policy](https://github.com/quantumcoinproject/circl/security/policy).
 
+## About This Fork: Hybrid Signature Schemes
+
+This repository is a **fork of CIRCL** that adds **hybrid signature schemes**, combining classical and post-quantum components (e.g. Ed25519 with ML-DSA/Dilithium and SLH-DSA/SPHINCS+) for transition and resilience.
+
+### Hybrid schemes
+
+| Scheme ID | Package | Mode   | Components |
+|:---------:|---------|--------|------------|
+| 1 | [hybrideds](./sign/hybrideds) | Compact | Ed25519, Dilithium (SPHINCS+ key present, not signed in compact) |
+| 2 | [hybrideds](./sign/hybrideds) | Full   | Ed25519, Dilithium, SPHINCS+ SHAKE-256f |
+| 3 | [hybridedmldsaslhdsa](./sign/hybridedmldsaslhdsa) | Compact | Ed25519, ML-DSA-44 (SLH-DSA key present, not signed in compact) |
+| 4 | [hybridedmldsaslhdsa](./sign/hybridedmldsaslhdsa) | Full   | Ed25519, ML-DSA-44, SLH-DSA SHAKE-256f |
+| 5 | [hybridedmldsaslhdsa5](./sign/hybridedmldsaslhdsa5) | Full   | Ed25519, ML-DSA-87, SLH-DSA SHAKE-256s |
+
+### Audit and individual confirmation
+
+For **audit, validation, and independent verification** of hybrid signatures (e.g. cross-checking with PQClean or other implementations), see the **[hybridparser](./sign/hybridparser)** package. It provides:
+
+- **ParseHybrid**: parse a hybrid signature into per-component public keys and signatures (hex-encoded).
+- **CheckHybrid**: reconstruct and verify using the hybrid and each component verifier.
+
+The [hybridparser documentation](./sign/hybridparser/hybridparser.go) describes how to decode the hex components to bytes and pass them to other DSA implementations (e.g. PQClean, liboqs, or native libraries in other languages) for your own confirmation and audit. **Use that package and its docs for individual component verification and standards conformance checks.**
+
 ## Installation
 
 You can get CIRCL by fetching:
