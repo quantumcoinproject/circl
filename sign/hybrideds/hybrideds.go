@@ -44,25 +44,25 @@ random nonce  | original message | sphincs public key
 
 hybrid-message-hash = SHA3-512(compact-mode-message)
 
-Hybrid Signature Length (compact mode) = 1 + 1 + 64 + 2420 + 40 + {1 to 64}
+Hybrid Signature Length (compact mode) = 1 + 1 + 64 + 2420 + 40 + 32
 =======================================================================================================================
 Layout of signature:
 
-1 byte                  | 1 byte            | 64 bytes          | 2420 bytres         | 40 bytes     | {1 to 64 bytes}
+1 byte                  | 1 byte            | 64 bytes          | 2420 bytres         | 40 bytes     | 32 bytes
 signature id (always 1) | length of message | ed25519 signature | dilithium signature | random nonce | original message
 
 Full Signature
 ==================
 ==================
 
-Hybrid Signature Length (full, used during breakglass) = 1 + 1 + 64 + {1 to 64} + 2420 + 49856
+Hybrid Signature Length (full, used during breakglass) = 1 + 1 + 64 + 32 + 2420 + 49856
 =======================================================================================================================
 Layout of signature:
 
-1 byte                  | 1 byte            | 64 bytes          | {1 to 64 bytes}   | 2420 bytes          | 49856
+1 byte                  | 1 byte            | 64 bytes          | 32 bytes          | 2420 bytes          | 49856
 signature id (always 2) | length of message | ed25519 signature | original message  | dilithium signature | sphincs signature
 
-Message is variable length, between 1 to 64 bytes
+Message is fixed length of 32 bytes
 */
 
 const (
@@ -71,8 +71,8 @@ const (
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
 	PrivateKeySize       = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
 
-	SeedSizeSlhDsda                      = 96
-	SeedSize                             = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsda
+	SeedSizeSlhDsa                      = 96
+	SeedSize                             = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsa
 	CRYPTO_MSG_LENGTH                    = 32
 	DILITHIUM_ED25519_SPHINCS_COMPACT_ID = byte(1)
 	DILITHIUM_ED25519_SPHINCS_FULL_ID    = byte(2)

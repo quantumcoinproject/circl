@@ -36,14 +36,14 @@ Full Signature
 ==================
 ==================
 
-Hybrid Signature Length (full) = 1 + 1 + 64 + {1 to 64} + 4627 + 29792
+Hybrid Signature Length (full) = 1 + 1 + 64 + 32 + 4627 + 29792
 =======================================================================================================================
 Layout of signature:
 
-1 byte                  | 1 byte            | 64 bytes          | {1 to 64 bytes}   | 4627 bytes          | 29792
-signature id (always 4) | length of message | ed25519 signature | original message  | ml-dsa signature    | slh-dsa signature
+1 byte                  | 1 byte            | 64 bytes          | 32 bytes          | 4627 bytes          | 29792
+signature id (always 5) | length of message | ed25519 signature | original message  | ml-dsa signature    | slh-dsa signature
 
-Message is variable length, between 1 to 64 bytes
+Message is fixed length of 32 bytes
 */
 
 const (
@@ -116,7 +116,7 @@ func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 }
 
 func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKey *mldsa87.PrivateKey, slhdsaPriKey *slhdsa.PrivateKey, err error) {
-	if len(sk.key) != PrivateKeySize {
+	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
 		return nil, nil, nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
 	sk1 := make([]byte, ed25519.PrivateKeySize)
@@ -150,7 +150,7 @@ func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKe
 }
 
 func (sk *PrivateKey) GetPublicKey() (edsPubKey *PublicKey, err error) {
-	if len(sk.key) != PrivateKeySize {
+	if len(sk.key) != PrivateKeySize || len(sk.key) != PrivateKeySize {
 		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
 	}
 
@@ -168,7 +168,7 @@ func (sk *PrivateKey) GetPublicKey() (edsPubKey *PublicKey, err error) {
 }
 
 func (pk *PublicKey) getPublicKeys() (edPubKey *ed25519.PublicKey, mldsaPubKey *mldsa87.PublicKey, slhdsaPubKey *slhdsa.PublicKey, err error) {
-	if len(pk.key) != PublicKeySize {
+	if len(pk.key) != PublicKeySize || len(pk.key) != PublicKeySize {
 		return nil, nil, nil, errors.New(fmt.Sprintf("packed public key must be of %d bytes", PublicKeySize))
 	}
 	sk1 := make([]byte, ed25519.PublicKeySize)
