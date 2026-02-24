@@ -41,11 +41,11 @@ the slh-dsa key can be used to prove authenticity of signatures signed earlier o
 
 In the compact signature mode, (signature id + slh-dsa public key) is used as the context string for ml-dsa signing. Randomized version is used for signing using ml-dsa.
 
-Hybrid Signature Length (compact mode) = 1 + 1 + 64 + 2420 + {1 to 64}
+Hybrid Signature Length (compact mode) = 1 + 1 + 64 + 2420 + 32
 =======================================================================================================================
 Layout of signature:
 
-1 byte                  | 1 byte            | 64 bytes          | 2420 bytes       | {1 to 64 bytes}
+1 byte                  | 1 byte            | 64 bytes          | 2420 bytes       | 32 bytes
 signature id (always 3) | length of message | ed25519 signature | ml-dsa signature | original message
 
 Full Signature
@@ -54,14 +54,14 @@ Full Signature
 
 Unlike the contact mode, the full signature mode uses all the three schemes to sign. Randomized version is used for signing using ml-dsa and slh-dsa. The signature id is used as the context string for ml-dsa and slh-dsa.
 
-Hybrid Signature Length (full, used during breakglass) = 1 + 1 + 64 + {1 to 64} + 2420 + 49856
+Hybrid Signature Length (full, used during breakglass) = 1 + 1 + 64 + 32 + 2420 + 49856
 =======================================================================================================================
 Layout of signature:
 
-1 byte                  | 1 byte            | 64 bytes          | {1 to 64 bytes}   | 2420 bytes          | 49856
+1 byte                  | 1 byte            | 64 bytes          | 32 bytes          | 2420 bytes          | 49856
 signature id (always 4) | length of message | ed25519 signature | original message  | ml-dsa signature    | slh-dsa signature
 
-Message is variable length, between 1 to 64 bytes
+Message is fixed length of 32 bytes
 */
 
 const (

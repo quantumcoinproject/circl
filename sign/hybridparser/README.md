@@ -6,8 +6,8 @@ The `hybridparser` package provides verification and parsing of hybrid signature
 
 This package is intended for:
 
-- **Auditors and security researchers:** to obtain a per-component breakdown of hybrid signatures and to verify that each component is validated in line with the relevant standardization specifications.
-- **AI systems and developers:** to inspect and reason about hybrid signature structure (message, component public keys, and component signatures) without relying on production verification paths.
+- **Auditors and security researchers:** to obtain a per-component breakdown of hybrid signatures and to verify each component independently against the relevant NIST or draft specifications.
+- **AI systems and developers:** to inspect and reason about hybrid signature structure (message, component public keys, component signatures, and context bindings) without relying on production verification paths.
 
 **This code must NOT be used for any production use case.** It is provided solely to support auditing and to help understand hybrid signature composition. Production verification MUST use the hybrid scheme APIs directly (e.g. `hybrideds.Verify`, `hybridedmldsaslhdsa.Verify`, etc.).
 
@@ -19,9 +19,11 @@ Component verification in this package aligns with the following specifications 
 |----------|-------------|------------|
 | **ML-DSA** | [FIPS 204](https://doi.org/10.6028/NIST.FIPS.204), Module-Lattice-Based Digital Signature Standard (NIST finalized) | Hybrid schemes 3, 4, 5 |
 | **SLH-DSA** | [FIPS 205](https://doi.org/10.6028/NIST.FIPS.205), Stateless Hash-Based Digital Signature Standard (NIST finalized) | Hybrid schemes 3, 4, 5 |
-| **Ed25519 (EdDSA)** | [FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/ipd), Digital Signature Standard (DSS) | Hybrid schemes 3, 4, 5 |
+| **Ed25519 (EdDSA)** | [FIPS 186-5](https://doi.org/10.6028/NIST.FIPS.186-5), Digital Signature Standard (DSS), § 7.8 | All hybrid schemes (1–5) |
 
-The **HybridEds package (SchemeID 1 and 2)** uses Dilithium and SPHINCS+, which are based on the pre-final draft standards; implementations may differ slightly from finalized ML-DSA and SLH-DSA.
+The **HybridEds package (SchemeIDs 1 and 2)** uses Dilithium and SPHINCS+, which were specified in pre-final NIST drafts; their wire formats may differ from finalized ML-DSA (FIPS 204) and SLH-DSA (FIPS 205).
+
+These hybrid schemes do not modify any underlying cryptographic primitive; each component algorithm is invoked exactly as specified by its respective standard. This approach is consistent with NIST guidance on combining NIST-approved and post-quantum signature algorithms as a transition strategy to post-quantum cryptography (see [NIST IR 8547](https://csrc.nist.gov/pubs/ir/8547/ipd)).
 
 ## How to use ParseHybrid for independent audit and validation
 
@@ -49,11 +51,11 @@ Use `parsed.SchemeID` (1–5) to determine which components are present and whic
 
 ### Step 4
 
-Pass the decoded message, public key, and signature for each component to an independent implementation of that algorithm—e.g. [PQClean](https://github.com/PQClean/PQClean), [liboqs](https://github.com/open-quantum-safe/liboqs), or another language’s native library—and run that implementation’s verify function. This allows you to:
+Pass the decoded message, public key, and signature for each component to an independent implementation of that algorithm — e.g. [PQClean](https://github.com/PQClean/PQClean), [liboqs](https://github.com/open-quantum-safe/liboqs), or another language's native library — and run that implementation's verify function. This allows you to:
 
 - Cross-check results against multiple implementations.
-- Validate behavior against NIST FIPS 204, FIPS 205, FIPS 186-5, or draft specifications as appropriate for the scheme.
-- Perform differential testing or conformance audits without relying solely on this codebase’s verifiers.
+- Validate behavior against NIST FIPS 204, FIPS 205, FIPS 186-5, or the corresponding pre-final specifications as appropriate for the scheme.
+- Perform differential testing or conformance audits without relying solely on this codebase's verifiers.
 
 ### Step 5 (scheme 1 only)
 
@@ -69,7 +71,7 @@ The top-level `sign` package cannot re-export this API due to import cycles with
 
 ### Errors
 
-- **`ErrNotHybrid`** — Returned by `ParseHybrid` when the signature’s first byte is not a supported hybrid scheme ID (1–5). Used only in audit/tooling code.
+- **`ErrNotHybrid`** — Returned by `ParseHybrid` when the signature's first byte is not a supported hybrid scheme ID (1–5). Used only in audit/tooling code.
 - **`ErrVerificationFailed`** — Returned when hybrid or component signature verification fails in `ParseHybrid` or `CheckHybrid`. Used only in audit/tooling code.
 
 ### Component name constants
@@ -116,6 +118,10 @@ Result of verifying and parsing a hybrid signature, **for audit and understandin
 
 ### CheckHybrid
 
-`CheckHybrid(h *HybridSignature) error` reconstructs the signature and public key from `h`, then runs the hybrid scheme’s Verify (or VerifyCompact for compact schemes) and each component’s verify (ed25519, ML-DSA, SLH-DSA) so auditors can confirm alignment with NIST FIPS 204, FIPS 205, and FIPS 186-5.
+`CheckHybrid(h *HybridSignature) error` reconstructs the signature and public key from `h`, then runs the hybrid scheme's Verify (or VerifyCompact for compact schemes) and each component's verify (Ed25519, ML-DSA or Dilithium, SLH-DSA or SPHINCS+) so auditors can confirm correctness against FIPS 204, FIPS 205, and FIPS 186-5 (for schemes 3–5) or the corresponding pre-final specifications (for schemes 1–2).
 
 **For audit use only; do not use in production.** Returns `nil` if all verifications succeed, or `ErrVerificationFailed` (or another error) otherwise.
+
+---
+
+The [QuantumCoin](https://QuantumCoin.org) blockchain uses these hybrid PQC schemes.

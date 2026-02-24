@@ -2,12 +2,6 @@
 
 # CIRCL
 
-[![GitHub release](https://img.shields.io/github/release/quantumcoinproject/circl.svg)](https://github.com/quantumcoinproject/circl/releases/)
-[![CIRCL](https://github.com/quantumcoinproject/circl/workflows/CIRCL/badge.svg)](https://github.com/quantumcoinproject/circl/actions)
-[![GoDoc](https://godoc.org/github.com/quantumcoinproject/circl?status.svg)](https://pkg.go.dev/github.com/quantumcoinproject/circl?tab=overview)
-[![Go Report Card](https://goreportcard.com/badge/github.com/quantumcoinproject/circl)](https://goreportcard.com/report/github.com/quantumcoinproject/circl)
-[![codecov](https://codecov.io/gh/quantumcoinproject/circl/branch/main/graph/badge.svg)](https://codecov.io/gh/quantumcoinproject/circl)
-
 **CIRCL** (Cloudflare Interoperable, Reusable Cryptographic Library) is a collection
 of cryptographic primitives written in Go. The goal of this library is to be used as a tool for
 experimental deployment of cryptographic algorithms targeting Post-Quantum (PQ) and Elliptic
@@ -19,26 +13,34 @@ Curve Cryptography (ECC).
 
 ## About This Fork: Hybrid Signature Schemes
 
-This repository is a **fork of CIRCL** that adds **hybrid signature schemes**, combining classical and post-quantum components (e.g. Ed25519 with ML-DSA/Dilithium and SLH-DSA/SPHINCS+) for transition and resilience.
+This repository is a **fork of CIRCL** that adds **hybrid digital signature schemes** combining classical (Ed25519) and post-quantum (lattice-based and hash-based) components. Hybrid signatures reduce single-point-of-failure risk: if one algorithm family is broken — whether classical or PQC — the remaining components still protect authenticity. The [QuantumCoin blockchain](https://quantumcoin.org) uses these hybrid PQC signature schemes.
 
 ### Hybrid schemes
 
-| Scheme ID | Package | Mode   | Components |
-|:---------:|---------|--------|------------|
-| 1 | [hybrideds](./sign/hybrideds) | Compact | Ed25519, Dilithium (SPHINCS+ key present, not signed in compact) |
-| 2 | [hybrideds](./sign/hybrideds) | Full   | Ed25519, Dilithium, SPHINCS+ SHAKE-256f |
-| 3 | [hybridedmldsaslhdsa](./sign/hybridedmldsaslhdsa) | Compact | Ed25519, ML-DSA-44 (SLH-DSA key present, not signed in compact) |
-| 4 | [hybridedmldsaslhdsa](./sign/hybridedmldsaslhdsa) | Full   | Ed25519, ML-DSA-44, SLH-DSA SHAKE-256f |
-| 5 | [hybridedmldsaslhdsa5](./sign/hybridedmldsaslhdsa5) | Full   | Ed25519, ML-DSA-87, SLH-DSA SHAKE-256s |
+| Scheme ID | Package | Mode | Components | PK + Sig | Verify ops/s¹ |
+|:---------:|---------|------|------------|----------|:-------------:|
+| 1 | [hybrideds](./sign/hybrideds) | Compact | Ed25519 + Dilithium (SPHINCS+ key present, not signed) | 3,966 B | ~10,970 |
+| 2 | [hybrideds](./sign/hybrideds) | Full | Ed25519 + Dilithium + SPHINCS+ SHAKE-256f | 53,782 B | ~270 |
+| 3 | [hybridedmldsaslhdsa](./sign/hybridedmldsaslhdsa) | Compact | Ed25519 + ML-DSA-44 (SLH-DSA key present, not signed) | 3,926 B | ~9,980 |
+| 4 | [hybridedmldsaslhdsa](./sign/hybridedmldsaslhdsa) | Full | Ed25519 + ML-DSA-44 + SLH-DSA SHAKE-256f | 53,782 B | ~290 |
+| 5 | [hybridedmldsaslhdsa5](./sign/hybridedmldsaslhdsa5) | Full | Ed25519 + ML-DSA-87 + SLH-DSA SHAKE-256s (NIST Level 5) | 37,205 B | ~470 |
 
-### Audit and individual confirmation
+¹ Verify operations per second measured with `go test -bench` on an `AMD Ryzen 7 5800X` (single-threaded, Go 1.24, Windows/amd64).
 
-For **audit, validation, and independent verification** of hybrid signatures (e.g. cross-checking with PQClean or other implementations), see the **[hybridparser](./sign/hybridparser)** package. It provides:
+These hybrid schemes do not modify any underlying cryptographic primitive; each component algorithm is invoked exactly as specified by its NIST standard. This approach is consistent with NIST guidance on combining NIST-approved and post-quantum signature algorithms as a transition strategy to post-quantum cryptography (see [NIST IR 8547](https://csrc.nist.gov/pubs/ir/8547/ipd)).
 
-- **ParseHybrid**: parse a hybrid signature into per-component public keys and signatures (hex-encoded).
-- **CheckHybrid**: reconstruct and verify using the hybrid and each component verifier.
+**Compact mode** signs with Ed25519 and the lattice-based component only (ML-DSA or Dilithium). The hash-based component's (SLH-DSA / SPHINCS+) public key is part of the composite key but is not used for signing — keeping signatures small and verification fast. **Full mode** signs with all three components; it can serve as a **break-glass** mechanism (activated when an imminent threat is detected) or as the default signing mode for maximum assurance.
 
-The [hybridparser documentation](./sign/hybridparser/hybridparser.go) describes how to decode the hex components to bytes and pass them to other DSA implementations (e.g. PQClean, liboqs, or native libraries in other languages) for your own confirmation and audit. **Use that package and its docs for individual component verification and standards conformance checks.**
+Schemes 3–5 conform to finalized NIST standards: ML-DSA ([FIPS 204]), SLH-DSA ([FIPS 205]), and Ed25519 ([FIPS 186-5] § 7.8). They use context strings for domain separation in ML-DSA and SLH-DSA signing. **For new designs, prefer schemes 3–5.** Schemes 1–2 use pre-final NIST drafts (Dilithium / SPHINCS+) and a nonce-based compact construction; see the [hybrideds README](./sign/hybrideds/README.md) for details.
+
+### Audit and independent verification
+
+For **audit, validation, and independent per-component verification** of hybrid signatures (e.g. cross-checking against [PQClean](https://github.com/PQClean/PQClean), [liboqs](https://github.com/open-quantum-safe/liboqs), or other implementations), see the **[hybridparser](./sign/hybridparser)** package. It provides:
+
+- **ParseHybrid**: verify a hybrid signature and extract per-component public keys and signatures (hex-encoded) for independent re-verification.
+- **CheckHybrid**: reconstruct and verify using both the composite hybrid verifier and each component's verifier.
+
+The [hybridparser README](./sign/hybridparser/README.md) describes how to decode the hex components and pass them to external DSA implementations for conformance audits against FIPS 204, FIPS 205, and FIPS 186-5. **Use hybridparser for audit and tooling only; production verification must use each hybrid scheme's own APIs.**
 
 ## Installation
 

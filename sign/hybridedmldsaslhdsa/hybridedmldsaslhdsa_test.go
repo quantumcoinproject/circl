@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"testing"
-	"time"
 
 	"github.com/quantumcoinproject/circl/sign/ed25519"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44"
@@ -577,110 +576,68 @@ func BenchmarkSign(b *testing.B) {
 	}
 }
 
-func TestPerf(t *testing.T) {
-	if verifyFull() == false {
-		t.Fatalf("failed")
-	}
-	if verifyCompact() == false {
-		t.Fatalf("failed")
-	}
-}
-
-func verifyFull() bool {
+func BenchmarkVerifyFull(b *testing.B) {
 	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
 	if err != nil {
-		fmt.Println(err)
-		return false
+		b.Fatal(err)
 	}
 	var msg [CRYPTO_MSG_LENGTH]byte
 	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
 		msg[i] = i
 	}
-	random := rand.Reader
-	signature, err := Sign(priKey, random, msg[:])
+	signature, err := Sign(priKey, rand.Reader, msg[:])
 	if err != nil {
-		fmt.Println(err)
-		return false
+		b.Fatal(err)
 	}
-
-	start := time.Now()
-	for i := 0; i <= BenchMarkIterations; i++ {
-		if Verify(pubKey, msg[:], signature) == false {
-			return false
-		}
+	if !Verify(pubKey, msg[:], signature) {
+		b.Fatal("verify sanity check failed")
 	}
-	duration := time.Since(start)
-	fmt.Println("verifyFull Elapsed", duration, "iterations", BenchMarkIterations, "avg time ms", float64(duration.Milliseconds())/float64(BenchMarkIterations))
-	return true
-}
-
-func BenchmarkVerify(b *testing.B) {
 	b.ResetTimer()
-	if verifyFull() == false {
-		b.Fatalf("failed")
+	for i := 0; i < b.N; i++ {
+		Verify(pubKey, msg[:], signature)
 	}
 }
 
 func BenchmarkSignCompact(b *testing.B) {
+	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	var msg [CRYPTO_MSG_LENGTH]byte
+	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
+		msg[i] = i
+	}
+	signature, err := SignCompact(priKey, rand.Reader, msg[:])
+	if err != nil {
+		b.Fatal(err)
+	}
+	if !VerifyCompact(pubKey, msg[:], signature) {
+		b.Fatal("verify sanity check failed")
+	}
 	b.ResetTimer()
-	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
-	if err != nil {
-		b.Fatalf("failed")
+	for i := 0; i < b.N; i++ {
+		_, _ = SignCompact(priKey, rand.Reader, msg[:])
 	}
-	var msg [CRYPTO_MSG_LENGTH]byte
-	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
-		msg[i] = i
-	}
-	random := rand.Reader
-	signature, err := SignCompact(priKey, random, msg[:])
-	if err != nil {
-		fmt.Println(err)
-		b.Fatalf("failed")
-	}
-	if VerifyCompact(pubKey, msg[:], signature) == false {
-		b.Fatalf("verify failed")
-	}
-
-	for i := 0; i <= BenchMarkIterations; i++ {
-		signature, err = SignCompact(priKey, random, msg[:])
-		if err != nil {
-			fmt.Println(err)
-			b.Fatalf("failed")
-		}
-	}
-}
-
-func verifyCompact() bool {
-	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-	var msg [CRYPTO_MSG_LENGTH]byte
-	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
-		msg[i] = i
-	}
-	random := rand.Reader
-	signature, err := SignCompact(priKey, random, msg[:])
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-
-	start := time.Now()
-	for i := 0; i <= BenchMarkIterations; i++ {
-		if VerifyCompact(pubKey, msg[:], signature) == false {
-			return false
-		}
-	}
-	duration := time.Since(start)
-	fmt.Println("verifyCompact Elapsed", duration, "iterations", BenchMarkIterations, "avg time ms", float64(duration.Milliseconds())/float64(BenchMarkIterations))
-	return true
 }
 
 func BenchmarkVerifyCompact(b *testing.B) {
+	pubKey, priKey, err := NewKeyFromSeed(&CommonSeed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	var msg [CRYPTO_MSG_LENGTH]byte
+	for i := byte(0); i < CRYPTO_MSG_LENGTH; i++ {
+		msg[i] = i
+	}
+	signature, err := SignCompact(priKey, rand.Reader, msg[:])
+	if err != nil {
+		b.Fatal(err)
+	}
+	if !VerifyCompact(pubKey, msg[:], signature) {
+		b.Fatal("verify sanity check failed")
+	}
 	b.ResetTimer()
-	if verifyCompact() == false {
-		b.Fatalf("failed")
+	for i := 0; i < b.N; i++ {
+		VerifyCompact(pubKey, msg[:], signature)
 	}
 }
