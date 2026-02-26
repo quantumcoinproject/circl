@@ -59,7 +59,7 @@ Pass the decoded message, public key, and signature for each component to an ind
 
 ### Step 5 (scheme 1 only)
 
-For scheme 1 (compact), the value actually signed by the Ed25519 and Dilithium components is `SHA3-512(nonce || message || SPHINCS+ public key)`. Use `parsed.Nonce` (hex-decoded) and the SPHINCS+ public key from `parsed.PublicKeys` to reconstruct that digest when verifying those two components with external implementations.
+For scheme 1 (compact), the value actually signed by the Ed25519 and Dilithium components is `SHA3-512(nonce || message || SPHINCS+ public key)`. Use `parsed.AdditionalData["Scheme1Nonce"]` (hex-decoded) and the SPHINCS+ public key from `parsed.PublicKeys` to reconstruct that digest when verifying those two components with external implementations.
 
 ---
 
@@ -90,15 +90,29 @@ Use these as keys when reading from `HybridSignature.PublicKeys` and `HybridSign
 
 ### HybridSignature struct
 
-Result of verifying and parsing a hybrid signature, **for audit and understanding only**. All string fields are hex-encoded. This struct is not for production use; it exists to support inspection and NIST-aligned component verification during audits.
+Result of verifying and parsing a hybrid signature, **for audit and understanding only**. All string fields are hex-encoded unless noted. This struct is not for production use; it exists to support inspection and NIST-aligned component verification during audits.
 
 | Field | Description |
 |-------|-------------|
 | **SchemeID** | Hybrid scheme identifier from the first byte of the raw signature (1–5). Use in audit logic to dispatch to the correct NIST/FIPS component checks. See table below. |
-| **Message** | Hex-encoded message that was signed (common to all components). For scheme 1 (compact), the value signed by Ed25519 and Dilithium is `SHA3-512(nonce\|\|message\|\|SPHINCS+ public key)`; this field holds the original message. |
+| **SchemeName** | Single string listing component names in order (ML-DSA / Dilithium, SLH-DSA / SPHINCS+, Ed25519), separated by `" + "`. For schemes 1–2 the names are Dilithium and SPHINCS+; for 3–5 they are the ML-DSA and SLH-DSA variant names. Compact schemes (1 and 3) include the suffix `" (compact)"`. Example: `"mldsa44 + slhdsa SHAKE-256f + ed25519 (compact)"`. |
+| **Context** | Hex-encoded context byte string used when verifying ML-DSA and SLH-DSA components. **Scheme 3 (compact):** `SchemeID (1 byte) \|\| SLH-DSA public key`. **Schemes 4 and 5 (full):** single byte equal to `SchemeID`. Empty for schemes 1 and 2 (they do not use context in the same way). `CheckHybrid` verifies that this field matches the expected context for the scheme. |
+| **AdditionalData** | Map of scheme-specific extra fields (hex-encoded). For **scheme 1 (compact)** only, it contains three keys; nil or empty for all other schemes. Use the `AdditionalData*` constants as keys. **Keys:** * **Scheme1Nonce** — 40-byte nonce; required to reconstruct and re-verify scheme 1. * **Scheme1Mu** — Message μ: concatenation `Scheme1Nonce \|\| message \|\| SPHINCS+ public key`; Ed25519 and Dilithium sign the digest of μ. * **Scheme1Digest** — Digest `SHA3-512(μ)` (what is actually signed). `CheckHybrid` verifies that Scheme1Mu and Scheme1Digest match the expected values when re-verifying scheme 1. |
+| **Message** | Hex-encoded message that was signed (common to all components). For scheme 1 (compact), the value actually signed by Ed25519 and Dilithium is `SHA3-512(nonce\|\|message\|\|SPHINCS+ public key)`; this field holds the **original** message. |
 | **PublicKeys** | Map from component name (use `Component*` constants) to hex-encoded public key bytes. Enables per-component audit and re-verification against FIPS 204 / FIPS 205 / FIPS 186-5 as applicable. |
 | **Signatures** | Map from component name to hex-encoded signature bytes. Compact schemes (1 and 3) have two entries; full schemes have three. Enables audit of each component signature in isolation. |
-| **Nonce** | Hex-encoded 40-byte nonce; only set for scheme 1 (hybrideds compact). Empty for all other schemes. Required to reconstruct and re-verify scheme 1. |
+
+#### Message vs Scheme1Mu vs Scheme1Digest (scheme 1 only)
+
+In **scheme 1 (compact)**, Ed25519 and Dilithium do not sign the raw message. The following clarifies the three related notions (all hex-encoded in the struct / `AdditionalData`):
+
+| Notion | Where | Meaning |
+|--------|--------|--------|
+| **Message** | `Message` field | The **original** message bytes provided by the caller. This is the “user message” and is common to all schemes. |
+| **Scheme1Mu** (μ) | `AdditionalData["Scheme1Mu"]` | The **concatenation** used as input to the hash: `Scheme1Nonce \|\| Message \|\| SPHINCS+ public key`. So μ is the full preimage that gets hashed. |
+| **Scheme1Digest** | `AdditionalData["Scheme1Digest"]` | The **digest** `SHA3-512(μ)`. This is the value that Ed25519 and Dilithium actually sign in scheme 1. |
+
+In other words: **Message** is the original data; **Scheme1Mu** is the constructed string μ; **Scheme1Digest** is the hash of μ and is what the two components sign. For schemes 2–5, only **Message** is used in this way (components sign the message directly or with context; there is no μ/digest construction).
 
 #### SchemeID values
 
@@ -118,7 +132,7 @@ Result of verifying and parsing a hybrid signature, **for audit and understandin
 
 ### CheckHybrid
 
-`CheckHybrid(h *HybridSignature) error` reconstructs the signature and public key from `h`, then runs the hybrid scheme's Verify (or VerifyCompact for compact schemes) and each component's verify (Ed25519, ML-DSA or Dilithium, SLH-DSA or SPHINCS+) so auditors can confirm correctness against FIPS 204, FIPS 205, and FIPS 186-5 (for schemes 3–5) or the corresponding pre-final specifications (for schemes 1–2).
+`CheckHybrid(h *HybridSignature) error` reconstructs the signature and public key from `h`, then runs the hybrid scheme's Verify (or VerifyCompact for compact schemes) and each component's verify (Ed25519, ML-DSA or Dilithium, SLH-DSA or SPHINCS+) so auditors can confirm correctness against FIPS 204, FIPS 205, and FIPS 186-5 (for schemes 3–5) or the corresponding pre-final specifications (for schemes 1–2). It also verifies that **Context** and **AdditionalData** (when set) match the values expected for the scheme (e.g. scheme 1: `AdditionalData[Scheme1Mu]` and `AdditionalData[Scheme1Digest]`; schemes 3–5: `Context` as above).
 
 **For audit use only; do not use in production.** Returns `nil` if all verifications succeed, or `ErrVerificationFailed` (or another error) otherwise.
 

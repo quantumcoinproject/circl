@@ -67,7 +67,7 @@
 //       on this codebase’s verifiers.
 //
 //  5. For scheme 1 (compact), the value actually signed by the Ed25519 and Dilithium
-//     components is SHA3-512(nonce || message || SPHINCS+ public key). Use parsed.Nonce
+//     components is SHA3-512(nonce || message || SPHINCS+ public key). Use parsed.AdditionalData["Scheme1Nonce"]
 //     (hex) and the SPHINCS+ public key from parsed.PublicKeys to reconstruct that
 //     digest when verifying those two components with external implementations.
 //
@@ -85,6 +85,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/quantumcoinproject/circl/sign/ed25519"
 	"github.com/quantumcoinproject/circl/sign/hybrideds"
@@ -115,6 +116,14 @@ const (
 	ComponentSLHDSA_SHAKE256s = "slhdsa SHAKE-256s"
 )
 
+// Keys for the AdditionalData map (scheme 1 only). Use when reading or writing
+// scheme-1-specific fields for audit tooling.
+const (
+	AdditionalDataScheme1Nonce  = "Scheme1Nonce"
+	AdditionalDataScheme1Mu     = "Scheme1Mu"
+	AdditionalDataScheme1Digest = "Scheme1Digest"
+)
+
 // HybridSignature holds the result of verifying and parsing a hybrid signature,
 // for audit and understanding only (see package documentation).
 //
@@ -133,6 +142,19 @@ type HybridSignature struct {
 	// Use this field in audit logic to dispatch to the correct NIST/FIPS component checks.
 	SchemeID byte
 
+	// SchemeName is the component names in order (mldsa, slhdsa, ed25519), separated by " + ".
+	// For older schemes (1 and 2), Dilithium and SPHINCS+ names are used respectively.
+	SchemeName string
+
+	// Context is the hex-encoded context string used during verification.
+	// For ML-DSA and SLH-DSA components, this is the context parameter.
+	Context string
+
+	// AdditionalData holds scheme-specific extra fields. For scheme 1 (compact) only,
+	// it contains keys Scheme1Nonce, Scheme1Mu, and Scheme1Digest (use AdditionalData*
+	// constants). Nil or empty for all other schemes.
+	AdditionalData map[string]string
+
 	// Message is the hex-encoded message that was signed (common to all components).
 	// For scheme 1 (compact), the value signed by Ed25519 and Dilithium is
 	// SHA3-512(nonce||message||SPHINCS+ public key); this field holds the original message.
@@ -148,9 +170,6 @@ type HybridSignature struct {
 	// have three. Enables audit of each component signature in isolation.
 	Signatures map[string]string
 
-	// Nonce is the hex-encoded 40-byte nonce used only in scheme 1 (hybrideds compact).
-	// Empty for all other schemes. Required to reconstruct and re-verify scheme 1.
-	Nonce string
 }
 
 const (
@@ -195,18 +214,35 @@ func parseHybridEDSCompact(signature, publicKey, message []byte) (*HybridSignatu
 		return nil, ErrVerificationFailed
 	}
 	out := &HybridSignature{
-		SchemeID:   signature[0],
-		Message:    hex.EncodeToString(message),
-		PublicKeys: make(map[string]string),
-		Signatures: make(map[string]string),
+		SchemeID:    signature[0],
+		SchemeName:  strings.Join([]string{ComponentDilithium, ComponentSphincsSHAKE256f, ComponentEd25519}, " + ") + " (compact)",
+		Message:     hex.EncodeToString(message),
+		PublicKeys:  make(map[string]string),
+		Signatures:  make(map[string]string),
 	}
 	out.PublicKeys[ComponentEd25519] = hex.EncodeToString(publicKey[0:ed25519PubSize])
 	out.PublicKeys[ComponentDilithium] = hex.EncodeToString(publicKey[ed25519PubSize : ed25519PubSize+mldsa44.PublicKeySize])
-	out.PublicKeys[ComponentSphincsSHAKE256f] = hex.EncodeToString(publicKey[ed25519PubSize+mldsa44.PublicKeySize:])
+	sphPub := publicKey[ed25519PubSize+mldsa44.PublicKeySize:]
+	out.PublicKeys[ComponentSphincsSHAKE256f] = hex.EncodeToString(sphPub)
 	out.Signatures[ComponentEd25519] = hex.EncodeToString(signature[2 : 2+ed25519SigSize])
 	out.Signatures[ComponentDilithium] = hex.EncodeToString(signature[2+ed25519SigSize : 2+ed25519SigSize+hybrideds.MLDSA44_SIG_LENGTH])
 	nonceOff := 2 + ed25519SigSize + hybrideds.MLDSA44_SIG_LENGTH
-	out.Nonce = hex.EncodeToString(signature[nonceOff : nonceOff+hybrideds.NonceSize])
+	nonce := signature[nonceOff : nonceOff+hybrideds.NonceSize]
+
+	// In scheme 1 (compact), the value signed by components is the digest SHA3-512(μ), where μ = nonce||message||SPHINCS+ public key.
+	hybridMsg := make([]byte, 0, hybrideds.NonceSize+len(message)+len(sphPub))
+	hybridMsg = append(hybridMsg, nonce...)
+	hybridMsg = append(hybridMsg, message...)
+	hybridMsg = append(hybridMsg, sphPub...)
+	hasher := sha3.New512()
+	_, _ = hasher.Write(hybridMsg)
+	digest := hasher.Sum(nil)
+
+	out.AdditionalData = map[string]string{
+		AdditionalDataScheme1Nonce:  hex.EncodeToString(nonce),
+		AdditionalDataScheme1Mu:     hex.EncodeToString(hybridMsg),
+		AdditionalDataScheme1Digest: hex.EncodeToString(digest),
+	}
 	return out, nil
 }
 
@@ -220,10 +256,11 @@ func parseHybridEDSFull(signature, publicKey, message []byte) (*HybridSignature,
 	}
 	msgLen := len(message)
 	out := &HybridSignature{
-		SchemeID:   signature[0],
-		Message:    hex.EncodeToString(message),
-		PublicKeys: make(map[string]string),
-		Signatures: make(map[string]string),
+		SchemeID:    signature[0],
+		SchemeName: strings.Join([]string{ComponentDilithium, ComponentSphincsSHAKE256f, ComponentEd25519}, " + "),
+		Message:     hex.EncodeToString(message),
+		PublicKeys:  make(map[string]string),
+		Signatures:  make(map[string]string),
 	}
 	out.PublicKeys[ComponentEd25519] = hex.EncodeToString(publicKey[0:ed25519PubSize])
 	out.PublicKeys[ComponentDilithium] = hex.EncodeToString(publicKey[ed25519PubSize : ed25519PubSize+mldsa44.PublicKeySize])
@@ -242,17 +279,26 @@ func parseHybridEDMLDSACompact(signature, publicKey, message []byte) (*HybridSig
 	if !hybridedmldsaslhdsa.VerifyCompact(pk, message, signature) {
 		return nil, ErrVerificationFailed
 	}
+	slhPub := publicKey[ed25519PubSize+mldsa44.PublicKeySize:]
 	out := &HybridSignature{
-		SchemeID:   signature[0],
-		Message:    hex.EncodeToString(message),
-		PublicKeys: make(map[string]string),
-		Signatures: make(map[string]string),
+		SchemeID:    signature[0],
+		SchemeName:  strings.Join([]string{ComponentMLDSA44, ComponentSLHDSA_SHAKE256f, ComponentEd25519}, " + ") + " (compact)",
+		Message:     hex.EncodeToString(message),
+		PublicKeys:  make(map[string]string),
+		Signatures:  make(map[string]string),
 	}
 	out.PublicKeys[ComponentEd25519] = hex.EncodeToString(publicKey[0:ed25519PubSize])
 	out.PublicKeys[ComponentMLDSA44] = hex.EncodeToString(publicKey[ed25519PubSize : ed25519PubSize+mldsa44.PublicKeySize])
-	out.PublicKeys[ComponentSLHDSA_SHAKE256f] = hex.EncodeToString(publicKey[ed25519PubSize+mldsa44.PublicKeySize:])
+	out.PublicKeys[ComponentSLHDSA_SHAKE256f] = hex.EncodeToString(slhPub)
 	out.Signatures[ComponentEd25519] = hex.EncodeToString(signature[2 : 2+ed25519SigSize])
 	out.Signatures[ComponentMLDSA44] = hex.EncodeToString(signature[2+ed25519SigSize : 2+ed25519SigSize+mldsa44.SignatureSize])
+
+	// In compact scheme 3, the ML-DSA context is SchemeID (3) + SLH-DSA public key.
+	context := make([]byte, 1+len(slhPub))
+	context[0] = signature[0]
+	copy(context[1:], slhPub)
+	out.Context = hex.EncodeToString(context)
+
 	return out, nil
 }
 
@@ -266,10 +312,11 @@ func parseHybridEDMLDSAFull(signature, publicKey, message []byte) (*HybridSignat
 	}
 	msgLen := len(message)
 	out := &HybridSignature{
-		SchemeID:   signature[0],
-		Message:    hex.EncodeToString(message),
-		PublicKeys: make(map[string]string),
-		Signatures: make(map[string]string),
+		SchemeID:    signature[0],
+		SchemeName: strings.Join([]string{ComponentMLDSA44, ComponentSLHDSA_SHAKE256f, ComponentEd25519}, " + "),
+		Message:     hex.EncodeToString(message),
+		PublicKeys:  make(map[string]string),
+		Signatures:  make(map[string]string),
 	}
 	out.PublicKeys[ComponentEd25519] = hex.EncodeToString(publicKey[0:ed25519PubSize])
 	out.PublicKeys[ComponentMLDSA44] = hex.EncodeToString(publicKey[ed25519PubSize : ed25519PubSize+mldsa44.PublicKeySize])
@@ -277,6 +324,10 @@ func parseHybridEDMLDSAFull(signature, publicKey, message []byte) (*HybridSignat
 	out.Signatures[ComponentEd25519] = hex.EncodeToString(signature[2 : 2+ed25519SigSize])
 	out.Signatures[ComponentMLDSA44] = hex.EncodeToString(signature[2+ed25519SigSize+msgLen : 2+ed25519SigSize+msgLen+mldsa44.SignatureSize])
 	out.Signatures[ComponentSLHDSA_SHAKE256f] = hex.EncodeToString(signature[2+ed25519SigSize+msgLen+mldsa44.SignatureSize:])
+
+	// In full scheme 4, the context is just the SchemeID (4).
+	out.Context = hex.EncodeToString([]byte{signature[0]})
+
 	return out, nil
 }
 
@@ -290,10 +341,11 @@ func parseHybridEDMLDSA5Full(signature, publicKey, message []byte) (*HybridSigna
 	}
 	msgLen := len(message)
 	out := &HybridSignature{
-		SchemeID:   signature[0],
-		Message:    hex.EncodeToString(message),
-		PublicKeys: make(map[string]string),
-		Signatures: make(map[string]string),
+		SchemeID:    signature[0],
+		SchemeName: strings.Join([]string{ComponentMLDSA87, ComponentSLHDSA_SHAKE256s, ComponentEd25519}, " + "),
+		Message:     hex.EncodeToString(message),
+		PublicKeys:  make(map[string]string),
+		Signatures:  make(map[string]string),
 	}
 	out.PublicKeys[ComponentEd25519] = hex.EncodeToString(publicKey[0:ed25519PubSize])
 	out.PublicKeys[ComponentMLDSA87] = hex.EncodeToString(publicKey[ed25519PubSize : ed25519PubSize+mldsa87.PublicKeySize])
@@ -301,6 +353,10 @@ func parseHybridEDMLDSA5Full(signature, publicKey, message []byte) (*HybridSigna
 	out.Signatures[ComponentEd25519] = hex.EncodeToString(signature[2 : 2+ed25519SigSize])
 	out.Signatures[ComponentMLDSA87] = hex.EncodeToString(signature[2+ed25519SigSize+msgLen : 2+ed25519SigSize+msgLen+mldsa87.SignatureSize])
 	out.Signatures[ComponentSLHDSA_SHAKE256s] = hex.EncodeToString(signature[2+ed25519SigSize+msgLen+mldsa87.SignatureSize:])
+
+	// In full scheme 5, the context is just the SchemeID (5).
+	out.Context = hex.EncodeToString([]byte{signature[0]})
+
 	return out, nil
 }
 
@@ -370,9 +426,15 @@ func checkHybridEDSCompact(h *HybridSignature, msg []byte, msgLen byte) error {
 	if err != nil {
 		return err
 	}
-	nonce, err := hex.DecodeString(h.Nonce)
-	if err != nil || len(nonce) != hybrideds.NonceSize {
-		return fmt.Errorf("hybridparser: invalid or missing nonce for scheme 1")
+	if h.AdditionalData == nil {
+		return fmt.Errorf("hybridparser: missing AdditionalData for scheme 1")
+	}
+	nonce, err := getHex(h.AdditionalData, AdditionalDataScheme1Nonce)
+	if err != nil {
+		return err
+	}
+	if len(nonce) != hybrideds.NonceSize {
+		return fmt.Errorf("hybridparser: invalid nonce length for scheme 1")
 	}
 	pubKey := make([]byte, 0, len(edPub)+len(dilPub)+len(sphPub))
 	pubKey = append(pubKey, edPub...)
@@ -396,9 +458,15 @@ func checkHybridEDSCompact(h *HybridSignature, msg []byte, msgLen byte) error {
 	hybridMsg = append(hybridMsg, nonce...)
 	hybridMsg = append(hybridMsg, msg...)
 	hybridMsg = append(hybridMsg, sphPub...)
+	if h.AdditionalData[AdditionalDataScheme1Mu] != hex.EncodeToString(hybridMsg) {
+		return fmt.Errorf("hybridparser: AdditionalData[Scheme1Mu] does not match expected (Scheme1Nonce||message||SPHINCS+ public key)")
+	}
 	hasher := sha3.New512()
 	_, _ = hasher.Write(hybridMsg)
 	hybridMsgHash := hasher.Sum(nil)
+	if h.AdditionalData[AdditionalDataScheme1Digest] != hex.EncodeToString(hybridMsgHash) {
+		return fmt.Errorf("hybridparser: AdditionalData[Scheme1Digest] does not match SHA3-512(μ)")
+	}
 	edPk, err := ed25519.UnmarshalPublicKey(edPub)
 	if err != nil {
 		return err
@@ -536,6 +604,9 @@ func checkHybridEDMLDSACompact(h *HybridSignature, msg []byte, msgLen byte) erro
 	context := make([]byte, 1+len(slhPub))
 	context[0] = hybridedmldsaslhdsa.ED25519_MLDSA_SLHDSA_COMPACT_ID
 	copy(context[1:], slhPub)
+	if h.Context != hex.EncodeToString(context) {
+		return fmt.Errorf("hybridparser: Context does not match expected (SchemeID || SLH-DSA public key)")
+	}
 	if !mldsa44.Verify(mldsaPk, msg, context, mldsaSig) {
 		return ErrVerificationFailed
 	}
@@ -597,6 +668,9 @@ func checkHybridEDMLDSAFull(h *HybridSignature, msg []byte, msgLen byte) error {
 		return err
 	}
 	context := []byte{hybridedmldsaslhdsa.ED25519_MLDSA_SLHDSA_FULL_ID}
+	if h.Context != hex.EncodeToString(context) {
+		return fmt.Errorf("hybridparser: Context does not match expected (SchemeID)")
+	}
 	if !mldsa44.Verify(mldsaPk, msg, context, mldsaSig) {
 		return ErrVerificationFailed
 	}
@@ -666,6 +740,9 @@ func checkHybridEDMLDSA5Full(h *HybridSignature, msg []byte, msgLen byte) error 
 		return err
 	}
 	context := []byte{hybridedmldsaslhdsa5.ED25519_MLDSA5_SLHDSA5_FULL_ID}
+	if h.Context != hex.EncodeToString(context) {
+		return fmt.Errorf("hybridparser: Context does not match expected (SchemeID)")
+	}
 	if !mldsa87.Verify(mldsaPk, msg, context, mldsaSig) {
 		return ErrVerificationFailed
 	}

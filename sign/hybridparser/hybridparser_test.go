@@ -2,6 +2,7 @@ package hybridparser
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	"github.com/quantumcoinproject/circl/sign/hybrideds"
@@ -76,8 +77,8 @@ func TestParseHybrid_Scheme1_Compact(t *testing.T) {
 	}
 	checkComponent(t, parsed.PublicKeys, []string{ComponentEd25519, ComponentDilithium, ComponentSphincsSHAKE256f})
 	checkComponent(t, parsed.Signatures, []string{ComponentEd25519, ComponentDilithium})
-	if parsed.Nonce == "" {
-		t.Error("scheme 1: expected Nonce to be set")
+	if parsed.AdditionalData == nil || parsed.AdditionalData[AdditionalDataScheme1Nonce] == "" {
+		t.Error("scheme 1: expected AdditionalData[Scheme1Nonce] to be set")
 	}
 }
 
@@ -333,13 +334,18 @@ func cloneHybridSignature(h *HybridSignature) *HybridSignature {
 		Message:    h.Message,
 		PublicKeys: make(map[string]string),
 		Signatures: make(map[string]string),
-		Nonce:      h.Nonce,
 	}
 	for k, v := range h.PublicKeys {
 		dup.PublicKeys[k] = v
 	}
 	for k, v := range h.Signatures {
 		dup.Signatures[k] = v
+	}
+	if h.AdditionalData != nil {
+		dup.AdditionalData = make(map[string]string)
+		for k, v := range h.AdditionalData {
+			dup.AdditionalData[k] = v
+		}
 	}
 	return dup
 }
@@ -398,6 +404,121 @@ func checkComponent(t *testing.T, m map[string]string, names []string) {
 	}
 	if len(m) != len(names) {
 		t.Errorf("map has %d entries, want %d", len(m), len(names))
+	}
+}
+
+// truncHex returns s if len(s) <= max, else s[:max]+"...".
+func truncHex(s string, max int) string {
+	if max <= 0 {
+		max = 32
+	}
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
+}
+
+// jsonOutput is a display-friendly copy of HybridSignature with truncated hex fields.
+type jsonOutput struct {
+	SchemeID       byte              `json:"SchemeID"`
+	SchemeName     string            `json:"SchemeName"`
+	Context        string            `json:"Context"`
+	AdditionalData map[string]string `json:"AdditionalData"`
+	Message        string            `json:"Message"`
+	PublicKeys     map[string]string `json:"PublicKeys"`
+	Signatures     map[string]string `json:"Signatures"`
+}
+
+func hybridSignatureToJSONOutput(h *HybridSignature, hexLen int) jsonOutput {
+	out := jsonOutput{
+		SchemeID:       h.SchemeID,
+		SchemeName:     h.SchemeName,
+		Context:        truncHex(h.Context, hexLen),
+		AdditionalData: make(map[string]string),
+		Message:        truncHex(h.Message, hexLen),
+		PublicKeys:     make(map[string]string),
+		Signatures:     make(map[string]string),
+	}
+	for k, v := range h.AdditionalData {
+		out.AdditionalData[k] = truncHex(v, hexLen)
+	}
+	for k, v := range h.PublicKeys {
+		out.PublicKeys[k] = truncHex(v, hexLen)
+	}
+	for k, v := range h.Signatures {
+		out.Signatures[k] = truncHex(v, hexLen)
+	}
+	return out
+}
+
+// TestParseHybrid_JSONOutput logs the JSON form of HybridSignature for each scheme.
+// Long hex strings are truncated so output is readable. Run: go test -v -run TestParseHybrid_JSONOutput ./sign/hybridparser/
+func TestParseHybrid_JSONOutput(t *testing.T) {
+	schemes := []struct {
+		name string
+		run  func() (*HybridSignature, error)
+	}{
+		{"scheme1", func() (*HybridSignature, error) {
+			pub, priv, _ := hybrideds.NewKeyFromSeed(&seedEDS)
+			// Use deterministicReader(1) so AdditionalData Scheme1Nonce and Scheme1Mu are not all zeros.
+			sig, err := hybrideds.SignCompact(priv, deterministicReader(1), testMsg[:])
+			if err != nil {
+				return nil, err
+			}
+			pubBytes, _ := pub.MarshalBinary()
+			return ParseHybrid(sig, pubBytes, testMsg[:])
+		}},
+		{"scheme2", func() (*HybridSignature, error) {
+			pub, priv, _ := hybrideds.NewKeyFromSeed(&seedEDS)
+			sig, err := hybrideds.Sign(priv, deterministicReader(0), testMsg[:])
+			if err != nil {
+				return nil, err
+			}
+			pubBytes, _ := pub.MarshalBinary()
+			return ParseHybrid(sig, pubBytes, testMsg[:])
+		}},
+		{"scheme3", func() (*HybridSignature, error) {
+			pub, priv, _ := hybridedmldsaslhdsa.NewKeyFromSeed(&seedEDMLDSA)
+			sig, err := hybridedmldsaslhdsa.SignCompact(priv, deterministicReader(0), testMsg[:])
+			if err != nil {
+				return nil, err
+			}
+			pubBytes, _ := pub.MarshalBinary()
+			return ParseHybrid(sig, pubBytes, testMsg[:])
+		}},
+		{"scheme4", func() (*HybridSignature, error) {
+			pub, priv, _ := hybridedmldsaslhdsa.NewKeyFromSeed(&seedEDMLDSA)
+			sig, err := hybridedmldsaslhdsa.Sign(priv, deterministicReader(0), testMsg[:])
+			if err != nil {
+				return nil, err
+			}
+			pubBytes, _ := pub.MarshalBinary()
+			return ParseHybrid(sig, pubBytes, testMsg[:])
+		}},
+		{"scheme5", func() (*HybridSignature, error) {
+			pub, priv, _ := hybridedmldsaslhdsa5.NewKeyFromSeed(&seedEDMLDSA5)
+			sig, err := hybridedmldsaslhdsa5.Sign(priv, deterministicReader(0), testMsg[:])
+			if err != nil {
+				return nil, err
+			}
+			pubBytes, _ := pub.MarshalBinary()
+			return ParseHybrid(sig, pubBytes, testMsg[:])
+		}},
+	}
+	const hexLen = 48 // show first 48 hex chars for readability
+	for _, tc := range schemes {
+		t.Run(tc.name, func(t *testing.T) {
+			parsed, err := tc.run()
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			disp := hybridSignatureToJSONOutput(parsed, hexLen)
+			b, err := json.MarshalIndent(disp, "", "  ")
+			if err != nil {
+				t.Fatalf("json.MarshalIndent: %v", err)
+			}
+			t.Logf("\n%s", string(b))
+		})
 	}
 }
 
