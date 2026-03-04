@@ -9,7 +9,17 @@ const (
 	SeedExpanderDomain = "hybrid-ed-ml87-slhshake256s-72-160-v1"
 )
 
-// ExpandSeed Ensure input seed is created from a CSPRNG
+// ExpandSeed expands a short input seed into the scheme's full seed for
+// hybrid key generation.
+//
+// Blockchain use only: this expander is intended solely for expanding an input
+// seed (typically mapped from mnemonics or seed phrases) into an output seed
+// used to generate hybrid-signature wallet keypairs. The expansion is
+// deterministic and domain-separated. Do not use for other purposes; the
+// construction has not been analyzed for use outside this blockchain
+// key-derivation workflow.
+//
+// The input seed MUST be from a CSPRNG (or a KDF with sufficient min-entropy).
 func ExpandSeed(baseSeed [BaseSeedSize]byte) (expandedSeed [SeedSize]byte, err error) {
 	h := sha3.NewShake256()
 

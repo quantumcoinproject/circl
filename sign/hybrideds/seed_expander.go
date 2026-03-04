@@ -16,6 +16,13 @@ const (
 // ExpandSeed derives a 160-byte hybrid seed from a 96-byte base seed for
 // ML-DSA-44 + Ed25519 + SLH-DSA-SHAKE-256f key generation.
 //
+// Blockchain use only: this expander is intended solely for expanding an input
+// seed (typically mapped from mnemonics or seed phrases) into an output seed
+// used to generate hybrid-signature wallet keypairs. The expansion is
+// deterministic and domain-separated. Do not use for other purposes; the
+// construction has not been analyzed for use outside this blockchain
+// key-derivation workflow.
+//
 // Use only when a shorter seed is needed (e.g., derived from a mnemonic);
 // otherwise generate a full 160-byte seed directly from a CSPRNG.
 //
