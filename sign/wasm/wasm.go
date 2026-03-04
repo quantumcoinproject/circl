@@ -693,7 +693,7 @@ func Register() {
 	hybrid5NS.Set("CryptoMsgLength", hybrid5.CRYPTO_MSG_LENGTH)
 
 	circlNS := js.Global().Get("Object").New()
-	circlNS.Set("hybrid", hybridNS)
-	circlNS.Set("hybrid5", hybrid5NS)
+	circlNS.Set("hybridedmldsaslhdsa", hybridNS)
+	circlNS.Set("hybridedmldsaslhds5", hybrid5NS)
 	js.Global().Set("circl", circlNS)
 }
