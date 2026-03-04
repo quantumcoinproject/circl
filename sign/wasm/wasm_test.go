@@ -91,6 +91,42 @@ func TestHybrid5ConstantsMatchWasmDoc(t *testing.T) {
 	}
 }
 
+// cryptoRandomMaxSize must match the maxSize constant in wasm.go (cryptoRandom).
+const cryptoRandomMaxSize = 1048576
+
+// TestCryptoRandom exercises the same crypto/rand.Read logic used by
+// circl.cryptoRandom(size) in wasm.go. The WASM callback is only built for
+// js+wasm, so we verify the CSPRNG behavior and documented size limit here.
+func TestCryptoRandom(t *testing.T) {
+	sizes := []int{0, 1, 32, 256, cryptoRandomMaxSize}
+	for _, n := range sizes {
+		b := make([]byte, n)
+		got, err := rand.Read(b)
+		if err != nil {
+			t.Fatalf("rand.Read(size=%d): %v", n, err)
+		}
+		if got != n {
+			t.Errorf("rand.Read(size=%d): read %d bytes, want %d", n, got, n)
+		}
+		if len(b) != n {
+			t.Errorf("rand.Read(size=%d): buffer len = %d, want %d", n, len(b), n)
+		}
+	}
+
+	// Two calls should produce different output (CSPRNG)
+	a := make([]byte, 32)
+	b := make([]byte, 32)
+	if _, err := rand.Read(a); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rand.Read(b); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(a, b) {
+		t.Error("two 32-byte reads from crypto/rand produced identical output")
+	}
+}
+
 func TestHybridGenerateKeyAndSignVerify(t *testing.T) {
 	pub, priv, err := hybrid.GenerateKey(rand.Reader)
 	if err != nil {

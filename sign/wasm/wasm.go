@@ -864,7 +864,38 @@ func hybridedsExpandSeed(_ js.Value, args []js.Value) any {
 //	circl.hybrideds.expandSeed(baseSeed)               -> {result: Uint8Array, error}
 //	circl.hybrideds.PublicKeySize, .PrivateKeySize, .SeedSize, .BaseSeedSize
 //	circl.hybrideds.SigLength, .CompactSigLength, .CryptoMsgLength          (number)
+//
+// # Utilities
+//
+//	circl.cryptoRandom(size) -> {result: Uint8Array, error}  — CSPRNG bytes from crypto/rand
 // ---------------------------------------------------------------------------
+
+// cryptoRandom fills a byte array of the given size with cryptographically secure
+// random bytes from crypto/rand.
+//
+// JS: circl.cryptoRandom(size: number) -> {result: Uint8Array, error: null}
+//
+// size must be a non-negative integer. Returns error if size is invalid or
+// crypto/rand fails. Maximum allowed size is 1048576 (1 MiB).
+func cryptoRandom(_ js.Value, args []js.Value) any {
+	const maxSize = 1048576
+	if errResult := checkArgs("cryptoRandom", args, 1); errResult != nil {
+		return errResult
+	}
+	n := args[0].Int()
+	if n < 0 {
+		return jsErrorStr("cryptoRandom: size must be non-negative")
+	}
+	if n > maxSize {
+		return jsErrorStr(fmt.Sprintf("cryptoRandom: size must be at most %d", maxSize))
+	}
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return jsError(err)
+	}
+	return jsResult(bytesToUint8Array(b))
+}
+
 func Register() {
 	hybridNS := js.Global().Get("Object").New()
 	hybridNS.Set("generateKey", js.FuncOf(hybridGenerateKey))
@@ -924,5 +955,6 @@ func Register() {
 	circlNS.Set("hybridedmldsaslhdsa", hybridNS)
 	circlNS.Set("hybridedmldsaslhds5", hybrid5NS)
 	circlNS.Set("hybrideds", hybridedsNS)
+	circlNS.Set("cryptoRandom", js.FuncOf(cryptoRandom))
 	js.Global().Set("circl", circlNS)
 }
