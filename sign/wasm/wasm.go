@@ -2,15 +2,15 @@
 // +build js,wasm
 
 // Package wasm exposes post-quantum hybrid signature schemes to JavaScript
-// via WebAssembly. It wraps two underlying Go packages:
+// via WebAssembly. It wraps three underlying Go packages:
 //
-//   - hybridedmldsaslhdsa  (Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f) — "hybrid"
-//   - hybridedmldsaslhdsa5 (Ed25519 + ML-DSA-87 + SLH-DSA-SHAKE-256s) — "hybrid5"
+//   - hybridedmldsaslhdsa  (Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f) — "hybridedmldsaslhdsa"
+//   - hybridedmldsaslhdsa5 (Ed25519 + ML-DSA-87 + SLH-DSA-SHAKE-256s) — "hybridedmldsaslhds5"
+//   - hybrideds            (Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f) — "hybrideds"
 //
-// Both schemes combine a classical signature (Ed25519) with two post-quantum
-// signatures (ML-DSA, formerly Dilithium, and SLH-DSA, formerly SPHINCS+).
-// The "hybrid" variant uses ML-DSA-44 / SLH-DSA-SHAKE-256f (NIST level 2-3);
-// the "hybrid5" variant uses ML-DSA-87 / SLH-DSA-SHAKE-256s (NIST level 5).
+// All schemes combine a classical signature (Ed25519) with two post-quantum
+// signatures (ML-DSA and SLH-DSA). The "hybrideds" variant uses the same
+// algorithms as hybridedmldsaslhdsa with a different key layout and seed expander.
 //
 // # Build
 //
@@ -114,6 +114,7 @@ import (
 
 	hybrid "github.com/quantumcoinproject/circl/sign/hybridedmldsaslhdsa"
 	hybrid5 "github.com/quantumcoinproject/circl/sign/hybridedmldsaslhdsa5"
+	hybrideds "github.com/quantumcoinproject/circl/sign/hybrideds"
 )
 
 // uint8ArrayToBytes converts a JavaScript Uint8Array (js.Value) into a Go []byte.
@@ -617,6 +618,201 @@ func hybrid5ExpandSeed(_ js.Value, args []js.Value) any {
 	return jsResult(bytesToUint8Array(expanded[:]))
 }
 
+// ===========================================================================
+// hybrideds — Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f (same algorithms as
+// hybridedmldsaslhdsa, different key layout and seed expander)
+//
+// Provides full and compact signing modes like the hybrid namespace.
+// ===========================================================================
+
+// hybridedsGenerateKey generates a random key pair using crypto/rand.
+//
+// JS: circl.hybrideds.generateKey() -> {result: {publicKey, privateKey}, error: null}
+func hybridedsGenerateKey(_ js.Value, _ []js.Value) any {
+	pub, priv, err := hybrideds.GenerateKey(rand.Reader)
+	if err != nil {
+		return jsError(err)
+	}
+	kp, err := marshalKeyPair(pub, priv)
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(kp)
+}
+
+// hybridedsNewKeyFromSeed derives a deterministic key pair from a seed.
+//
+// JS: circl.hybrideds.newKeyFromSeed(seed: Uint8Array) -> {result: {publicKey, privateKey}, error: null}
+func hybridedsNewKeyFromSeed(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.newKeyFromSeed", args, 1); errResult != nil {
+		return errResult
+	}
+	seedBytes := uint8ArrayToBytes(args[0])
+	var seed [hybrideds.SeedSize]byte
+	copy(seed[:], seedBytes)
+	pub, priv, err := hybrideds.NewKeyFromSeed(&seed)
+	if err != nil {
+		return jsError(err)
+	}
+	kp, err := marshalKeyPair(pub, priv)
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(kp)
+}
+
+// hybridedsSign produces a full hybrideds signature over a 32-byte message.
+//
+// JS: circl.hybrideds.sign(privateKey: Uint8Array, message: Uint8Array) -> {result: Uint8Array, error: null}
+func hybridedsSign(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.sign", args, 2); errResult != nil {
+		return errResult
+	}
+	privKeyBytes := uint8ArrayToBytes(args[0])
+	msg := uint8ArrayToBytes(args[1])
+	priv, err := hybrideds.UnmarshalPrivateKey(privKeyBytes)
+	if err != nil {
+		return jsError(err)
+	}
+	sig, err := hybrideds.Sign(priv, rand.Reader, msg)
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(bytesToUint8Array(sig))
+}
+
+// hybridedsVerify checks a full hybrideds signature.
+//
+// JS: circl.hybrideds.verify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) -> {result: boolean, error: null}
+func hybridedsVerify(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.verify", args, 3); errResult != nil {
+		return errResult
+	}
+	pubKeyBytes := uint8ArrayToBytes(args[0])
+	msg := uint8ArrayToBytes(args[1])
+	sig := uint8ArrayToBytes(args[2])
+	pub, err := hybrideds.UnmarshalPublicKey(pubKeyBytes)
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(hybrideds.Verify(pub, msg, sig))
+}
+
+// hybridedsSignCompact produces a compact signature (Ed25519 + ML-DSA-44 only).
+//
+// JS: circl.hybrideds.signCompact(privateKey: Uint8Array, message: Uint8Array) -> {result: Uint8Array, error: null}
+func hybridedsSignCompact(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.signCompact", args, 2); errResult != nil {
+		return errResult
+	}
+	privKeyBytes := uint8ArrayToBytes(args[0])
+	msg := uint8ArrayToBytes(args[1])
+	priv, err := hybrideds.UnmarshalPrivateKey(privKeyBytes)
+	if err != nil {
+		return jsError(err)
+	}
+	sig, err := hybrideds.SignCompact(priv, rand.Reader, msg)
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(bytesToUint8Array(sig))
+}
+
+// hybridedsVerifyCompact checks a compact hybrideds signature.
+//
+// JS: circl.hybrideds.verifyCompact(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) -> {result: boolean, error: null}
+func hybridedsVerifyCompact(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.verifyCompact", args, 3); errResult != nil {
+		return errResult
+	}
+	pubKeyBytes := uint8ArrayToBytes(args[0])
+	msg := uint8ArrayToBytes(args[1])
+	sig := uint8ArrayToBytes(args[2])
+	pub, err := hybrideds.UnmarshalPublicKey(pubKeyBytes)
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(hybrideds.VerifyCompact(pub, msg, sig))
+}
+
+// hybridedsGetPublicKey extracts the public key from a private key.
+//
+// JS: circl.hybrideds.getPublicKey(privateKey: Uint8Array) -> {result: Uint8Array, error: null}
+func hybridedsGetPublicKey(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.getPublicKey", args, 1); errResult != nil {
+		return errResult
+	}
+	privKeyBytes := uint8ArrayToBytes(args[0])
+	priv, err := hybrideds.UnmarshalPrivateKey(privKeyBytes)
+	if err != nil {
+		return jsError(err)
+	}
+	pub, err := priv.GetPublicKey()
+	if err != nil {
+		return jsError(err)
+	}
+	pubBytes, err := pub.MarshalBinary()
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(bytesToUint8Array(pubBytes))
+}
+
+// hybridedsUnmarshalPublicKey validates and round-trips a raw public key.
+//
+// JS: circl.hybrideds.unmarshalPublicKey(data: Uint8Array) -> {result: Uint8Array, error: null}
+func hybridedsUnmarshalPublicKey(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.unmarshalPublicKey", args, 1); errResult != nil {
+		return errResult
+	}
+	data := uint8ArrayToBytes(args[0])
+	pub, err := hybrideds.UnmarshalPublicKey(data)
+	if err != nil {
+		return jsError(err)
+	}
+	result, err := pub.MarshalBinary()
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(bytesToUint8Array(result))
+}
+
+// hybridedsUnmarshalPrivateKey validates and round-trips a raw private key.
+//
+// JS: circl.hybrideds.unmarshalPrivateKey(data: Uint8Array) -> {result: Uint8Array, error: null}
+func hybridedsUnmarshalPrivateKey(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.unmarshalPrivateKey", args, 1); errResult != nil {
+		return errResult
+	}
+	data := uint8ArrayToBytes(args[0])
+	priv, err := hybrideds.UnmarshalPrivateKey(data)
+	if err != nil {
+		return jsError(err)
+	}
+	result, err := priv.MarshalBinary()
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(bytesToUint8Array(result))
+}
+
+// hybridedsExpandSeed expands a base seed into a full-length seed for newKeyFromSeed.
+//
+// JS: circl.hybrideds.expandSeed(baseSeed: Uint8Array) -> {result: Uint8Array, error: null}
+func hybridedsExpandSeed(_ js.Value, args []js.Value) any {
+	if errResult := checkArgs("hybrideds.expandSeed", args, 1); errResult != nil {
+		return errResult
+	}
+	baseSeedBytes := uint8ArrayToBytes(args[0])
+	var baseSeed [hybrideds.BaseSeedSize]byte
+	copy(baseSeed[:], baseSeedBytes)
+	expanded, err := hybrideds.ExpandSeed(baseSeed)
+	if err != nil {
+		return jsError(err)
+	}
+	return jsResult(bytesToUint8Array(expanded[:]))
+}
+
 // ---------------------------------------------------------------------------
 // Register exposes all functions and constants to JavaScript.
 //
@@ -655,6 +851,19 @@ func hybrid5ExpandSeed(_ js.Value, args []js.Value) any {
 //	circl.hybrid5.BaseSeedSize                          (number)
 //	circl.hybrid5.SigLength                             (number)
 //	circl.hybrid5.CryptoMsgLength                       (number)
+//
+//	circl.hybrideds.generateKey()                       -> {result: {publicKey, privateKey}, error}
+//	circl.hybrideds.newKeyFromSeed(seed)                -> {result: {publicKey, privateKey}, error}
+//	circl.hybrideds.sign(privateKey, message)           -> {result: Uint8Array, error}
+//	circl.hybrideds.verify(publicKey, message, sig)     -> {result: boolean, error}
+//	circl.hybrideds.signCompact(privateKey, message)   -> {result: Uint8Array, error}
+//	circl.hybrideds.verifyCompact(publicKey, message, sig) -> {result: boolean, error}
+//	circl.hybrideds.getPublicKey(privateKey)           -> {result: Uint8Array, error}
+//	circl.hybrideds.unmarshalPublicKey(data)            -> {result: Uint8Array, error}
+//	circl.hybrideds.unmarshalPrivateKey(data)          -> {result: Uint8Array, error}
+//	circl.hybrideds.expandSeed(baseSeed)               -> {result: Uint8Array, error}
+//	circl.hybrideds.PublicKeySize, .PrivateKeySize, .SeedSize, .BaseSeedSize
+//	circl.hybrideds.SigLength, .CompactSigLength, .CryptoMsgLength          (number)
 // ---------------------------------------------------------------------------
 func Register() {
 	hybridNS := js.Global().Get("Object").New()
@@ -692,8 +901,28 @@ func Register() {
 	hybrid5NS.Set("BaseSeedSize", hybrid5.BaseSeedSize)
 	hybrid5NS.Set("CryptoMsgLength", hybrid5.CRYPTO_MSG_LENGTH)
 
+	hybridedsNS := js.Global().Get("Object").New()
+	hybridedsNS.Set("generateKey", js.FuncOf(hybridedsGenerateKey))
+	hybridedsNS.Set("newKeyFromSeed", js.FuncOf(hybridedsNewKeyFromSeed))
+	hybridedsNS.Set("sign", js.FuncOf(hybridedsSign))
+	hybridedsNS.Set("verify", js.FuncOf(hybridedsVerify))
+	hybridedsNS.Set("signCompact", js.FuncOf(hybridedsSignCompact))
+	hybridedsNS.Set("verifyCompact", js.FuncOf(hybridedsVerifyCompact))
+	hybridedsNS.Set("getPublicKey", js.FuncOf(hybridedsGetPublicKey))
+	hybridedsNS.Set("unmarshalPublicKey", js.FuncOf(hybridedsUnmarshalPublicKey))
+	hybridedsNS.Set("unmarshalPrivateKey", js.FuncOf(hybridedsUnmarshalPrivateKey))
+	hybridedsNS.Set("expandSeed", js.FuncOf(hybridedsExpandSeed))
+	hybridedsNS.Set("PublicKeySize", hybrideds.PublicKeySize)
+	hybridedsNS.Set("PrivateKeySize", hybrideds.PrivateKeySize)
+	hybridedsNS.Set("SeedSize", hybrideds.SeedSize)
+	hybridedsNS.Set("BaseSeedSize", hybrideds.BaseSeedSize)
+	hybridedsNS.Set("SigLength", hybrideds.SigLength)
+	hybridedsNS.Set("CompactSigLength", hybrideds.CompactSigLength)
+	hybridedsNS.Set("CryptoMsgLength", hybrideds.CRYPTO_MSG_LENGTH)
+
 	circlNS := js.Global().Get("Object").New()
 	circlNS.Set("hybridedmldsaslhdsa", hybridNS)
 	circlNS.Set("hybridedmldsaslhds5", hybrid5NS)
+	circlNS.Set("hybrideds", hybridedsNS)
 	js.Global().Set("circl", circlNS)
 }
