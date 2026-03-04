@@ -10,6 +10,7 @@ import (
 
 	hybrid "github.com/quantumcoinproject/circl/sign/hybridedmldsaslhdsa"
 	hybrid5 "github.com/quantumcoinproject/circl/sign/hybridedmldsaslhdsa5"
+	hybrideds "github.com/quantumcoinproject/circl/sign/hybrideds"
 )
 
 // These tests run only when not building for JS (see build tags). They exercise
@@ -42,6 +43,31 @@ func TestHybridConstantsMatchWasmDoc(t *testing.T) {
 	}
 }
 
+func TestHybridedsConstantsMatchWasmDoc(t *testing.T) {
+	// Documented in wasm.go for circl.hybrideds
+	if hybrideds.PublicKeySize != 1408 {
+		t.Errorf("hybrideds.PublicKeySize = %d, want 1408", hybrideds.PublicKeySize)
+	}
+	if hybrideds.PrivateKeySize != 4064 {
+		t.Errorf("hybrideds.PrivateKeySize = %d, want 4064", hybrideds.PrivateKeySize)
+	}
+	if hybrideds.SeedSize != 160 {
+		t.Errorf("hybrideds.SeedSize = %d, want 160", hybrideds.SeedSize)
+	}
+	if hybrideds.BaseSeedSize != 96 {
+		t.Errorf("hybrideds.BaseSeedSize = %d, want 96", hybrideds.BaseSeedSize)
+	}
+	if hybrideds.SigLength != 52374 {
+		t.Errorf("hybrideds.SigLength = %d, want 52374", hybrideds.SigLength)
+	}
+	if hybrideds.CompactSigLength != 2558 {
+		t.Errorf("hybrideds.CompactSigLength = %d, want 2558", hybrideds.CompactSigLength)
+	}
+	if hybrideds.CRYPTO_MSG_LENGTH != 32 {
+		t.Errorf("hybrideds.CRYPTO_MSG_LENGTH = %d, want 32", hybrideds.CRYPTO_MSG_LENGTH)
+	}
+}
+
 func TestHybrid5ConstantsMatchWasmDoc(t *testing.T) {
 	// Documented in wasm.go package doc for circl.hybrid5
 	if hybrid5.PublicKeySize != 2688 {
@@ -62,6 +88,42 @@ func TestHybrid5ConstantsMatchWasmDoc(t *testing.T) {
 	}
 	if hybrid5.CRYPTO_MSG_LENGTH != 32 {
 		t.Errorf("hybrid5.CRYPTO_MSG_LENGTH = %d, want 32", hybrid5.CRYPTO_MSG_LENGTH)
+	}
+}
+
+// cryptoRandomMaxSize must match the maxSize constant in wasm.go (cryptoRandom).
+const cryptoRandomMaxSize = 1048576
+
+// TestCryptoRandom exercises the same crypto/rand.Read logic used by
+// circl.cryptoRandom(size) in wasm.go. The WASM callback is only built for
+// js+wasm, so we verify the CSPRNG behavior and documented size limit here.
+func TestCryptoRandom(t *testing.T) {
+	sizes := []int{0, 1, 32, 256, cryptoRandomMaxSize}
+	for _, n := range sizes {
+		b := make([]byte, n)
+		got, err := rand.Read(b)
+		if err != nil {
+			t.Fatalf("rand.Read(size=%d): %v", n, err)
+		}
+		if got != n {
+			t.Errorf("rand.Read(size=%d): read %d bytes, want %d", n, got, n)
+		}
+		if len(b) != n {
+			t.Errorf("rand.Read(size=%d): buffer len = %d, want %d", n, len(b), n)
+		}
+	}
+
+	// Two calls should produce different output (CSPRNG)
+	a := make([]byte, 32)
+	b := make([]byte, 32)
+	if _, err := rand.Read(a); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rand.Read(b); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(a, b) {
+		t.Error("two 32-byte reads from crypto/rand produced identical output")
 	}
 }
 
@@ -279,6 +341,141 @@ func TestHybrid5UnmarshalRoundTrip(t *testing.T) {
 	}
 
 	priv2, err := hybrid5.UnmarshalPrivateKey(privBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	priv2Bytes, _ := priv2.MarshalBinary()
+	if !bytes.Equal(privBytes, priv2Bytes) {
+		t.Error("UnmarshalPrivateKey round-trip failed")
+	}
+}
+
+func TestHybridedsGenerateKeyAndSignVerify(t *testing.T) {
+	pub, priv, err := hybrideds.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, _ := pub.MarshalBinary()
+	privBytes, _ := priv.MarshalBinary()
+	if len(pubBytes) != hybrideds.PublicKeySize {
+		t.Errorf("public key length = %d, want %d", len(pubBytes), hybrideds.PublicKeySize)
+	}
+	if len(privBytes) != hybrideds.PrivateKeySize {
+		t.Errorf("private key length = %d, want %d", len(privBytes), hybrideds.PrivateKeySize)
+	}
+
+	var msg [hybrideds.CRYPTO_MSG_LENGTH]byte
+	if _, err := rand.Read(msg[:]); err != nil {
+		t.Fatal(err)
+	}
+	sig, err := hybrideds.Sign(priv, rand.Reader, msg[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sig) != hybrideds.SigLength {
+		t.Errorf("signature length = %d, want %d", len(sig), hybrideds.SigLength)
+	}
+	if !hybrideds.Verify(pub, msg[:], sig) {
+		t.Error("Verify failed")
+	}
+}
+
+func TestHybridedsNewKeyFromSeed(t *testing.T) {
+	var seed [hybrideds.SeedSize]byte
+	for i := range seed {
+		seed[i] = byte(i)
+	}
+	pub, priv, err := hybrideds.NewKeyFromSeed(&seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, _ := pub.MarshalBinary()
+	privBytes, _ := priv.MarshalBinary()
+	if len(pubBytes) != hybrideds.PublicKeySize || len(privBytes) != hybrideds.PrivateKeySize {
+		t.Errorf("key sizes: pub %d, priv %d", len(pubBytes), len(privBytes))
+	}
+	pub2, priv2, err := hybrideds.NewKeyFromSeed(&seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub2Bytes, _ := pub2.MarshalBinary()
+	priv2Bytes, _ := priv2.MarshalBinary()
+	if !bytes.Equal(pubBytes, pub2Bytes) || !bytes.Equal(privBytes, priv2Bytes) {
+		t.Error("deterministic key from seed: keys differ on second call")
+	}
+}
+
+func TestHybridedsSignCompactVerifyCompact(t *testing.T) {
+	pub, priv, err := hybrideds.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var msg [hybrideds.CRYPTO_MSG_LENGTH]byte
+	if _, err := rand.Read(msg[:]); err != nil {
+		t.Fatal(err)
+	}
+	sig, err := hybrideds.SignCompact(priv, rand.Reader, msg[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sig) != hybrideds.CompactSigLength {
+		t.Errorf("compact signature length = %d, want %d", len(sig), hybrideds.CompactSigLength)
+	}
+	if !hybrideds.VerifyCompact(pub, msg[:], sig) {
+		t.Error("VerifyCompact failed")
+	}
+}
+
+func TestHybridedsGetPublicKey(t *testing.T) {
+	_, priv, err := hybrideds.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := priv.GetPublicKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, err := pub.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pubBytes) != hybrideds.PublicKeySize {
+		t.Errorf("getPublicKey length = %d, want %d", len(pubBytes), hybrideds.PublicKeySize)
+	}
+}
+
+func TestHybridedsExpandSeed(t *testing.T) {
+	var baseSeed [hybrideds.BaseSeedSize]byte
+	if _, err := rand.Read(baseSeed[:]); err != nil {
+		t.Fatal(err)
+	}
+	expanded, err := hybrideds.ExpandSeed(baseSeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expanded) != hybrideds.SeedSize {
+		t.Errorf("expandSeed length = %d, want %d", len(expanded), hybrideds.SeedSize)
+	}
+}
+
+func TestHybridedsUnmarshalRoundTrip(t *testing.T) {
+	pub, priv, err := hybrideds.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, _ := pub.MarshalBinary()
+	privBytes, _ := priv.MarshalBinary()
+
+	pub2, err := hybrideds.UnmarshalPublicKey(pubBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub2Bytes, _ := pub2.MarshalBinary()
+	if !bytes.Equal(pubBytes, pub2Bytes) {
+		t.Error("UnmarshalPublicKey round-trip failed")
+	}
+
+	priv2, err := hybrideds.UnmarshalPrivateKey(privBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
