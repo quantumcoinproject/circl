@@ -41,24 +41,24 @@
 //	await go.run(result.instance);
 //
 //	// --- circl.hybrid (Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f) ---
-//	const res = circl.hybrid.generateKey();
+//	const res = circl.hybridedmldsaslhdsa.generateKey();
 //	if (res.error) { console.error(res.error); return; }
 //	const keys = res.result; // {publicKey: Uint8Array, privateKey: Uint8Array}
 //
-//	const sigRes = circl.hybrid.sign(keys.privateKey, msg);
+//	const sigRes = circl.hybridedmldsaslhdsa.sign(keys.privateKey, msg);
 //	if (sigRes.error) { console.error(sigRes.error); return; }
 //	const sig = sigRes.result; // Uint8Array
 //
-//	const verRes = circl.hybrid.verify(keys.publicKey, msg, sig);
+//	const verRes = circl.hybridedmldsaslhdsa.verify(keys.publicKey, msg, sig);
 //	if (verRes.error) { console.error(verRes.error); return; }
 //	const ok = verRes.result; // boolean
 //
 //	// Compact mode (Ed25519 + ML-DSA only, SLH-DSA key retained for breakglass):
-//	const csigRes = circl.hybrid.signCompact(keys.privateKey, msg);
-//	const cverRes = circl.hybrid.verifyCompact(keys.publicKey, msg, csigRes.result);
+//	const csigRes = circl.hybridedmldsaslhdsa.signCompact(keys.privateKey, msg);
+//	const cverRes = circl.hybridedmldsaslhdsa.verifyCompact(keys.publicKey, msg, csigRes.result);
 //
 //	// --- circl.hybrid5 (Ed25519 + ML-DSA-87 + SLH-DSA-SHAKE-256s) ---
-//	const res5 = circl.hybrid5.generateKey();
+//	const res5 = circl.hybridedmldsaslhdsa5.generateKey();
 //	if (res5.error) { console.error(res5.error); return; }
 //	const keys5 = res5.result;
 //
@@ -80,7 +80,7 @@
 //
 // The JS caller should always check .error before using .result:
 //
-//	const res = circl.hybrid.sign(privKey, msg);
+//	const res = circl.hybridedmldsaslhdsa.sign(privKey, msg);
 //	if (res.error) {
 //	    console.error("sign failed:", res.error);
 //	} else {
@@ -91,20 +91,20 @@
 //
 // Each namespace also exposes numeric constants for buffer sizing:
 //
-//	circl.hybrid.PublicKeySize      // 1408 — byte length of a hybrid public key
-//	circl.hybrid.PrivateKeySize     // 4064 — byte length of a hybrid private key
-//	circl.hybrid.SeedSize           // 160  — byte length of expanded seed for newKeyFromSeed
-//	circl.hybrid.BaseSeedSize       // 64   — byte length of base seed for expandSeed
-//	circl.hybrid.SigLength          // 52374 — byte length of a full signature
-//	circl.hybrid.CompactSigLength   // 2517 — byte length of a compact signature
-//	circl.hybrid.CryptoMsgLength    // 32   — required message length
+//	circl.hybridedmldsaslhdsa.PublicKeySize      // 1408 — byte length of a hybrid public key
+//	circl.hybridedmldsaslhdsa.PrivateKeySize     // 4064 — byte length of a hybrid private key
+//	circl.hybridedmldsaslhdsa.SeedSize           // 160  — byte length of expanded seed for newKeyFromSeed
+//	circl.hybridedmldsaslhdsa.BaseSeedSize       // 64   — byte length of base seed for expandSeed
+//	circl.hybridedmldsaslhdsa.SigLength          // 52374 — byte length of a full signature
+//	circl.hybridedmldsaslhdsa.CompactSigLength   // 2517 — byte length of a compact signature
+//	circl.hybridedmldsaslhdsa.CryptoMsgLength    // 32   — required message length
 //
-//	circl.hybrid5.PublicKeySize     // 2688 — byte length of a hybrid5 public key
-//	circl.hybrid5.PrivateKeySize    // 7680 — byte length of a hybrid5 private key
-//	circl.hybrid5.SeedSize          // 160  — byte length of expanded seed for newKeyFromSeed
-//	circl.hybrid5.BaseSeedSize      // 72   — byte length of base seed for expandSeed
-//	circl.hybrid5.SigLength         // 34486 — byte length of a full signature
-//	circl.hybrid5.CryptoMsgLength   // 32   — required message length
+//	circl.hybridedmldsaslhdsa5.PublicKeySize     // 2688 — byte length of a hybrid5 public key
+//	circl.hybridedmldsaslhdsa5.PrivateKeySize    // 7680 — byte length of a hybrid5 private key
+//	circl.hybridedmldsaslhdsa5.SeedSize          // 160  — byte length of expanded seed for newKeyFromSeed
+//	circl.hybridedmldsaslhdsa5.BaseSeedSize      // 72   — byte length of base seed for expandSeed
+//	circl.hybridedmldsaslhdsa5.SigLength         // 34486 — byte length of a full signature
+//	circl.hybridedmldsaslhdsa5.CryptoMsgLength   // 32   — required message length
 package wasm
 
 import (
@@ -200,7 +200,7 @@ func marshalKeyPair(pubKey, privKey interface {
 
 // hybridGenerateKey generates a random key pair using crypto/rand.
 //
-// JS: circl.hybrid.generateKey() -> {result: {publicKey, privateKey}, error: null}
+// JS: circl.hybridedmldsaslhdsa.generateKey() -> {result: {publicKey, privateKey}, error: null}
 //
 // No arguments. Returns error result on internal RNG failure.
 func hybridGenerateKey(_ js.Value, _ []js.Value) any {
@@ -217,7 +217,7 @@ func hybridGenerateKey(_ js.Value, _ []js.Value) any {
 
 // hybridNewKeyFromSeed derives a deterministic key pair from a seed.
 //
-// JS: circl.hybrid.newKeyFromSeed(seed: Uint8Array) -> {result: {publicKey, privateKey}, error: null}
+// JS: circl.hybridedmldsaslhdsa.newKeyFromSeed(seed: Uint8Array) -> {result: {publicKey, privateKey}, error: null}
 //
 // seed must be exactly hybrid.SeedSize bytes (160). The same seed always
 // produces the same key pair. Returns error result if the seed is the wrong
@@ -243,7 +243,7 @@ func hybridNewKeyFromSeed(_ js.Value, args []js.Value) any {
 // hybridSign produces a full hybrid signature (Ed25519 + ML-DSA-44 + SLH-DSA)
 // over a 32-byte message.
 //
-// JS: circl.hybrid.sign(privateKey: Uint8Array, message: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa.sign(privateKey: Uint8Array, message: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // privateKey must be hybrid.PrivateKeySize bytes. message must be exactly 32
 // bytes. Returns a signature of hybrid.SigLength bytes in result. Returns
@@ -267,7 +267,7 @@ func hybridSign(_ js.Value, args []js.Value) any {
 
 // hybridVerify checks a full hybrid signature against a public key and message.
 //
-// JS: circl.hybrid.verify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) -> {result: boolean, error: null}
+// JS: circl.hybridedmldsaslhdsa.verify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) -> {result: boolean, error: null}
 //
 // publicKey must be hybrid.PublicKeySize bytes. message must be exactly 32
 // bytes. signature must be hybrid.SigLength bytes. Returns boolean in result.
@@ -289,7 +289,7 @@ func hybridVerify(_ js.Value, args []js.Value) any {
 // hybridSignCompact produces a compact signature (Ed25519 + ML-DSA-44 only,
 // no SLH-DSA component). Smaller and faster than a full signature.
 //
-// JS: circl.hybrid.signCompact(privateKey: Uint8Array, message: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa.signCompact(privateKey: Uint8Array, message: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // privateKey must be hybrid.PrivateKeySize bytes. message must be exactly 32
 // bytes. Returns a signature of hybrid.CompactSigLength bytes in result.
@@ -313,7 +313,7 @@ func hybridSignCompact(_ js.Value, args []js.Value) any {
 
 // hybridVerifyCompact checks a compact signature (Ed25519 + ML-DSA-44 only).
 //
-// JS: circl.hybrid.verifyCompact(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) -> {result: boolean, error: null}
+// JS: circl.hybridedmldsaslhdsa.verifyCompact(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) -> {result: boolean, error: null}
 //
 // publicKey must be hybrid.PublicKeySize bytes. message must be exactly 32
 // bytes. signature must be hybrid.CompactSigLength bytes. Returns boolean in
@@ -334,7 +334,7 @@ func hybridVerifyCompact(_ js.Value, args []js.Value) any {
 
 // hybridGetPublicKey extracts the public key from a private key.
 //
-// JS: circl.hybrid.getPublicKey(privateKey: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa.getPublicKey(privateKey: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // privateKey must be hybrid.PrivateKeySize bytes. Returns hybrid.PublicKeySize
 // bytes in result. Returns error result if the private key is malformed.
@@ -360,7 +360,7 @@ func hybridGetPublicKey(_ js.Value, args []js.Value) any {
 
 // hybridUnmarshalPublicKey validates and round-trips a raw public key.
 //
-// JS: circl.hybrid.unmarshalPublicKey(data: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa.unmarshalPublicKey(data: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // data must be exactly hybrid.PublicKeySize bytes. Returns error result if
 // invalid. Returns the validated key bytes (same content, freshly allocated)
@@ -383,7 +383,7 @@ func hybridUnmarshalPublicKey(_ js.Value, args []js.Value) any {
 
 // hybridUnmarshalPrivateKey validates and round-trips a raw private key.
 //
-// JS: circl.hybrid.unmarshalPrivateKey(data: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa.unmarshalPrivateKey(data: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // data must be exactly hybrid.PrivateKeySize bytes. Returns error result if
 // invalid. Returns the validated key bytes (same content, freshly allocated)
@@ -408,7 +408,7 @@ func hybridUnmarshalPrivateKey(_ js.Value, args []js.Value) any {
 // for hybridNewKeyFromSeed, using SHAKE-256 with domain separation string
 // "hybrid-ed-ml44-slhshake256f-64-160-v1".
 //
-// JS: circl.hybrid.expandSeed(baseSeed: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa.expandSeed(baseSeed: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // baseSeed must be exactly hybrid.BaseSeedSize bytes (64). Returns
 // hybrid.SeedSize bytes (160) in result. The base seed MUST originate from a
@@ -436,7 +436,7 @@ func hybridExpandSeed(_ js.Value, args []js.Value) any {
 
 // hybrid5GenerateKey generates a random key pair using crypto/rand.
 //
-// JS: circl.hybrid5.generateKey() -> {result: {publicKey, privateKey}, error: null}
+// JS: circl.hybridedmldsaslhdsa5.generateKey() -> {result: {publicKey, privateKey}, error: null}
 //
 // No arguments. Returns error result on internal RNG failure.
 func hybrid5GenerateKey(_ js.Value, _ []js.Value) any {
@@ -453,7 +453,7 @@ func hybrid5GenerateKey(_ js.Value, _ []js.Value) any {
 
 // hybrid5NewKeyFromSeed derives a deterministic key pair from a seed.
 //
-// JS: circl.hybrid5.newKeyFromSeed(seed: Uint8Array) -> {result: {publicKey, privateKey}, error: null}
+// JS: circl.hybridedmldsaslhdsa5.newKeyFromSeed(seed: Uint8Array) -> {result: {publicKey, privateKey}, error: null}
 //
 // seed must be exactly hybrid5.SeedSize bytes (160). The same seed always
 // produces the same key pair. Returns error result if the seed is the wrong
@@ -479,7 +479,7 @@ func hybrid5NewKeyFromSeed(_ js.Value, args []js.Value) any {
 // hybrid5Sign produces a full hybrid5 signature (Ed25519 + ML-DSA-87 + SLH-DSA)
 // over a 32-byte message.
 //
-// JS: circl.hybrid5.sign(privateKey: Uint8Array, message: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa5.sign(privateKey: Uint8Array, message: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // privateKey must be hybrid5.PrivateKeySize bytes. message must be exactly 32
 // bytes. Returns a signature of hybrid5.SigLength bytes in result. Returns
@@ -503,7 +503,7 @@ func hybrid5Sign(_ js.Value, args []js.Value) any {
 
 // hybrid5Verify checks a full hybrid5 signature against a public key and message.
 //
-// JS: circl.hybrid5.verify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) -> {result: boolean, error: null}
+// JS: circl.hybridedmldsaslhdsa5.verify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) -> {result: boolean, error: null}
 //
 // publicKey must be hybrid5.PublicKeySize bytes. message must be exactly 32
 // bytes. signature must be hybrid5.SigLength bytes. Returns boolean in result.
@@ -524,7 +524,7 @@ func hybrid5Verify(_ js.Value, args []js.Value) any {
 
 // hybrid5GetPublicKey extracts the public key from a private key.
 //
-// JS: circl.hybrid5.getPublicKey(privateKey: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa5.getPublicKey(privateKey: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // privateKey must be hybrid5.PrivateKeySize bytes. Returns
 // hybrid5.PublicKeySize bytes in result. Returns error result if the private
@@ -551,7 +551,7 @@ func hybrid5GetPublicKey(_ js.Value, args []js.Value) any {
 
 // hybrid5UnmarshalPublicKey validates and round-trips a raw public key.
 //
-// JS: circl.hybrid5.unmarshalPublicKey(data: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa5.unmarshalPublicKey(data: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // data must be exactly hybrid5.PublicKeySize bytes. Returns error result if
 // invalid. Returns the validated key bytes (same content, freshly allocated)
@@ -574,7 +574,7 @@ func hybrid5UnmarshalPublicKey(_ js.Value, args []js.Value) any {
 
 // hybrid5UnmarshalPrivateKey validates and round-trips a raw private key.
 //
-// JS: circl.hybrid5.unmarshalPrivateKey(data: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa5.unmarshalPrivateKey(data: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // data must be exactly hybrid5.PrivateKeySize bytes. Returns error result if
 // invalid. Returns the validated key bytes (same content, freshly allocated)
@@ -599,7 +599,7 @@ func hybrid5UnmarshalPrivateKey(_ js.Value, args []js.Value) any {
 // for hybrid5NewKeyFromSeed, using SHAKE-256 with domain separation string
 // "hybrid-ed-ml87-slhshake256s-72-160-v1".
 //
-// JS: circl.hybrid5.expandSeed(baseSeed: Uint8Array) -> {result: Uint8Array, error: null}
+// JS: circl.hybridedmldsaslhdsa5.expandSeed(baseSeed: Uint8Array) -> {result: Uint8Array, error: null}
 //
 // baseSeed must be exactly hybrid5.BaseSeedSize bytes (72). Returns
 // hybrid5.SeedSize bytes (160) in result. The base seed MUST originate from a
@@ -819,38 +819,38 @@ func hybridedsExpandSeed(_ js.Value, args []js.Value) any {
 // After calling Register(), the following namespace is available on
 // globalThis.circl. Every function returns {result, error} — see package doc.
 //
-//	circl.hybrid.generateKey()                          -> {result: {publicKey, privateKey}, error}
-//	circl.hybrid.newKeyFromSeed(seed)                   -> {result: {publicKey, privateKey}, error}
-//	circl.hybrid.sign(privateKey, message)              -> {result: Uint8Array, error}
-//	circl.hybrid.verify(publicKey, message, sig)        -> {result: boolean, error}
-//	circl.hybrid.signCompact(privateKey, message)       -> {result: Uint8Array, error}
-//	circl.hybrid.verifyCompact(publicKey, message, sig) -> {result: boolean, error}
-//	circl.hybrid.getPublicKey(privateKey)               -> {result: Uint8Array, error}
-//	circl.hybrid.unmarshalPublicKey(data)               -> {result: Uint8Array, error}
-//	circl.hybrid.unmarshalPrivateKey(data)              -> {result: Uint8Array, error}
-//	circl.hybrid.expandSeed(baseSeed)                   -> {result: Uint8Array, error}
-//	circl.hybrid.PublicKeySize                          (number)
-//	circl.hybrid.PrivateKeySize                         (number)
-//	circl.hybrid.SeedSize                               (number)
-//	circl.hybrid.BaseSeedSize                           (number)
-//	circl.hybrid.SigLength                              (number)
-//	circl.hybrid.CompactSigLength                       (number)
-//	circl.hybrid.CryptoMsgLength                        (number)
+//	circl.hybridedmldsaslhdsa.generateKey()                          -> {result: {publicKey, privateKey}, error}
+//	circl.hybridedmldsaslhdsa.newKeyFromSeed(seed)                   -> {result: {publicKey, privateKey}, error}
+//	circl.hybridedmldsaslhdsa.sign(privateKey, message)              -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa.verify(publicKey, message, sig)        -> {result: boolean, error}
+//	circl.hybridedmldsaslhdsa.signCompact(privateKey, message)       -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa.verifyCompact(publicKey, message, sig) -> {result: boolean, error}
+//	circl.hybridedmldsaslhdsa.getPublicKey(privateKey)               -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa.unmarshalPublicKey(data)               -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa.unmarshalPrivateKey(data)              -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa.expandSeed(baseSeed)                   -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa.PublicKeySize                          (number)
+//	circl.hybridedmldsaslhdsa.PrivateKeySize                         (number)
+//	circl.hybridedmldsaslhdsa.SeedSize                               (number)
+//	circl.hybridedmldsaslhdsa.BaseSeedSize                           (number)
+//	circl.hybridedmldsaslhdsa.SigLength                              (number)
+//	circl.hybridedmldsaslhdsa.CompactSigLength                       (number)
+//	circl.hybridedmldsaslhdsa.CryptoMsgLength                        (number)
 //
-//	circl.hybrid5.generateKey()                         -> {result: {publicKey, privateKey}, error}
-//	circl.hybrid5.newKeyFromSeed(seed)                  -> {result: {publicKey, privateKey}, error}
-//	circl.hybrid5.sign(privateKey, message)             -> {result: Uint8Array, error}
-//	circl.hybrid5.verify(publicKey, message, sig)       -> {result: boolean, error}
-//	circl.hybrid5.getPublicKey(privateKey)              -> {result: Uint8Array, error}
-//	circl.hybrid5.unmarshalPublicKey(data)              -> {result: Uint8Array, error}
-//	circl.hybrid5.unmarshalPrivateKey(data)             -> {result: Uint8Array, error}
-//	circl.hybrid5.expandSeed(baseSeed)                  -> {result: Uint8Array, error}
-//	circl.hybrid5.PublicKeySize                         (number)
-//	circl.hybrid5.PrivateKeySize                        (number)
-//	circl.hybrid5.SeedSize                              (number)
-//	circl.hybrid5.BaseSeedSize                          (number)
-//	circl.hybrid5.SigLength                             (number)
-//	circl.hybrid5.CryptoMsgLength                       (number)
+//	circl.hybridedmldsaslhdsa5.generateKey()                         -> {result: {publicKey, privateKey}, error}
+//	circl.hybridedmldsaslhdsa5.newKeyFromSeed(seed)                  -> {result: {publicKey, privateKey}, error}
+//	circl.hybridedmldsaslhdsa5.sign(privateKey, message)             -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa5.verify(publicKey, message, sig)       -> {result: boolean, error}
+//	circl.hybridedmldsaslhdsa5.getPublicKey(privateKey)              -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa5.unmarshalPublicKey(data)              -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa5.unmarshalPrivateKey(data)             -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa5.expandSeed(baseSeed)                  -> {result: Uint8Array, error}
+//	circl.hybridedmldsaslhdsa5.PublicKeySize                         (number)
+//	circl.hybridedmldsaslhdsa5.PrivateKeySize                        (number)
+//	circl.hybridedmldsaslhdsa5.SeedSize                              (number)
+//	circl.hybridedmldsaslhdsa5.BaseSeedSize                          (number)
+//	circl.hybridedmldsaslhdsa5.SigLength                             (number)
+//	circl.hybridedmldsaslhdsa5.CryptoMsgLength                       (number)
 //
 //	circl.hybrideds.generateKey()                       -> {result: {publicKey, privateKey}, error}
 //	circl.hybrideds.newKeyFromSeed(seed)                -> {result: {publicKey, privateKey}, error}
