@@ -43,6 +43,13 @@ func GenerateKey(rand io.Reader) (*PublicKey, *PrivateKey, error) {
 	return (*PublicKey)(pk), (*PrivateKey)(sk), err
 }
 
+// GenerateKeyInternal generates a public/private key pair using entropy from rand.
+// If rand is nil, crypto/rand.Reader will be used.
+func GenerateKeyInternal(rand io.Reader, nist bool) (*PublicKey, *PrivateKey, error) {
+	pk, sk, err := internal.GenerateKeyInternal(rand, nist)
+	return (*PublicKey)(pk), (*PrivateKey)(sk), err
+}
+
 // NewKeyFromSeed derives a public/private key pair using the given seed.
 func NewKeyFromSeed(seed *[SeedSize]byte) (*PublicKey, *PrivateKey) {
 	pk, sk := internal.NewKeyFromSeed(seed)

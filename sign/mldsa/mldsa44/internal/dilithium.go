@@ -171,8 +171,28 @@ func GenerateKey(rand io.Reader) (*PublicKey, *PrivateKey, error) {
 	return pk, sk, nil
 }
 
+// GenerateKeyInternal generates a public/private key pair using entropy from rand.
+// If rand is nil, crypto/rand.Reader will be used.
+func GenerateKeyInternal(rand io.Reader, nist bool) (*PublicKey, *PrivateKey, error) {
+	var seed [32]byte
+	if rand == nil {
+		rand = cryptoRand.Reader
+	}
+	_, err := io.ReadFull(rand, seed[:])
+	if err != nil {
+		return nil, nil, err
+	}
+	pk, sk := NewKeyFromSeedInternal(&seed, nist)
+	return pk, sk, nil
+}
+
 // NewKeyFromSeed derives a public/private key pair using the given seed.
 func NewKeyFromSeed(seed *[common.SeedSize]byte) (*PublicKey, *PrivateKey) {
+	return NewKeyFromSeedInternal(seed, NIST)
+}
+
+// NewKeyFromSeedInternal derives a public/private key pair using the given seed.
+func NewKeyFromSeedInternal(seed *[common.SeedSize]byte, nist bool) (*PublicKey, *PrivateKey) {
 	var eSeed [128]byte // expanded seed
 	var pk PublicKey
 	var sk PrivateKey
@@ -181,7 +201,7 @@ func NewKeyFromSeed(seed *[common.SeedSize]byte) (*PublicKey, *PrivateKey) {
 	h := sha3.NewShake256()
 	_, _ = h.Write(seed[:])
 
-	if NIST {
+	if nist {
 		_, _ = h.Write([]byte{byte(K), byte(L)})
 	}
 
