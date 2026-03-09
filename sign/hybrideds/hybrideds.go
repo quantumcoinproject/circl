@@ -71,7 +71,7 @@ const (
 	PublicKeySize        = ed25519.PublicKeySize + mldsa44.PublicKeySize + SlhDsaPublicKeySize
 	PrivateKeySize       = ed25519.PrivateKeySize + mldsa44.PrivateKeySize + mldsa44.PublicKeySize + SlhDsaPrivateKeySize
 
-	SeedSizeSlhDsa                      = 96
+	SeedSizeSlhDsa                       = 96
 	SeedSize                             = ed25519.SeedSize + mldsa44.SeedSize + SeedSizeSlhDsa
 	CRYPTO_MSG_LENGTH                    = 32
 	DILITHIUM_ED25519_SPHINCS_COMPACT_ID = byte(1)
@@ -232,7 +232,7 @@ func GenerateKey(random io.Reader) (pub *PublicKey, priv *PrivateKey, err error)
 		return nil, nil, err
 	}
 
-	mldsaPubKey, mlDsaPriKey, err := mldsa44.GenerateKey(random)
+	mldsaPubKey, mlDsaPriKey, err := mldsa44.GenerateKeyInternal(random, false)
 	if err != nil {
 		return nil, nil, err
 	}
