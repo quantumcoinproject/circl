@@ -19,13 +19,4 @@
 // To choose a scheme at runtime, use the generic signatures API under
 //
 //	github.com/quantumcoinproject/circl/sign/schemes
-//
-// The packages
-//
-//	github.com/quantumcoinproject/circl/sign/eddilithium2
-//	github.com/quantumcoinproject/circl/sign/eddilithium3
-//
-// implement hybrids of Dilithium2 with Ed25519 respectively and
-// Dilithium3 with Ed448.  These packages are a drop in replacements for the
-// mode subpackages of this package.
 package dilithium

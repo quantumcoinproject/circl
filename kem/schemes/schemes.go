@@ -12,7 +12,6 @@
 //
 // Post-quantum kems:
 //
-//	FrodoKEM-640-SHAKE
 //	Kyber512, Kyber768, Kyber1024
 package schemes
 
@@ -21,7 +20,6 @@ import (
 
 	"github.com/quantumcoinproject/circl/hpke"
 	"github.com/quantumcoinproject/circl/kem"
-	"github.com/quantumcoinproject/circl/kem/frodo/frodo640shake"
 	"github.com/quantumcoinproject/circl/kem/hybrid"
 	"github.com/quantumcoinproject/circl/kem/kyber/kyber1024"
 	"github.com/quantumcoinproject/circl/kem/kyber/kyber512"
@@ -38,7 +36,6 @@ var allSchemes = [...]kem.Scheme{
 	hpke.KEM_P521_HKDF_SHA512.Scheme(),
 	hpke.KEM_X25519_HKDF_SHA256.Scheme(),
 	hpke.KEM_X448_HKDF_SHA512.Scheme(),
-	frodo640shake.Scheme(),
 	kyber512.Scheme(),
 	kyber768.Scheme(),
 	kyber1024.Scheme(),
