@@ -93,7 +93,7 @@ func TestGetKeys(t *testing.T) {
 
 	pri1, pri2, pri3, err := priKey.getPrivateKeys()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 
 	if pri1 == nil || pri2 == nil || pri3 == nil {
@@ -108,7 +108,7 @@ func TestGetKeys(t *testing.T) {
 
 	pub1, pub2, pub3, err := pubKey.getPublicKeys()
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 
 	if pub1 == nil || pub2 == nil || pub3 == nil {
