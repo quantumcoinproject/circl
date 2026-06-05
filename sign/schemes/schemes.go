@@ -3,9 +3,6 @@
 // Implemented schemes:
 //
 //	Ed25519
-//	Ed448
-//	Ed25519-Dilithium2
-//	Ed448-Dilithium3
 //	Dilithium
 //	ML-DSA
 //	SLH-DSA
@@ -19,9 +16,6 @@ import (
 	dilithium3 "github.com/quantumcoinproject/circl/sign/dilithium/mode3"
 	dilithium5 "github.com/quantumcoinproject/circl/sign/dilithium/mode5"
 	"github.com/quantumcoinproject/circl/sign/ed25519"
-	"github.com/quantumcoinproject/circl/sign/ed448"
-	"github.com/quantumcoinproject/circl/sign/eddilithium2"
-	"github.com/quantumcoinproject/circl/sign/eddilithium3"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa44"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa65"
 	"github.com/quantumcoinproject/circl/sign/mldsa/mldsa87"
@@ -30,9 +24,6 @@ import (
 
 var allSchemes = [...]sign.Scheme{
 	ed25519.Scheme(),
-	ed448.Scheme(),
-	eddilithium2.Scheme(),
-	eddilithium3.Scheme(),
 	dilithium2.Scheme(),
 	dilithium3.Scheme(),
 	dilithium5.Scheme(),
