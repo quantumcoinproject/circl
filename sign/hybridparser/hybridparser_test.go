@@ -530,3 +530,21 @@ func (r deterministicReader) Read(p []byte) (n int, err error) {
 	}
 	return len(p), nil
 }
+
+// TestCheckHybridRejectsOverlongMessage ensures the message-length guard is not
+// bypassed by byte() truncation: a message longer than CRYPTO_MSG_LENGTH (which
+// previously wrapped, e.g. 256 -> 0) must be rejected.
+func TestCheckHybridRejectsOverlongMessage(t *testing.T) {
+	for _, n := range []int{hybrideds.CRYPTO_MSG_LENGTH + 1, 256} {
+		h := &HybridSignature{
+			SchemeID:   hybrideds.DILITHIUM_ED25519_SPHINCS_FULL_ID,
+			Message:    hex.EncodeToString(make([]byte, n)),
+			PublicKeys: map[string]string{},
+			Signatures: map[string]string{},
+		}
+		err := CheckHybrid(h)
+		if err == nil || err.Error() != "hybridparser: message too long" {
+			t.Errorf("message length %d: got err %v, want \"message too long\"", n, err)
+		}
+	}
+}

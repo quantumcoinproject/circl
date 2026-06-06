@@ -384,10 +384,10 @@ func CheckHybrid(h *HybridSignature) error {
 	if err != nil || len(msg) == 0 {
 		return fmt.Errorf("hybridparser: invalid or empty message")
 	}
-	msgLen := byte(len(msg))
-	if msgLen > 64 {
+	if len(msg) > hybrideds.CRYPTO_MSG_LENGTH {
 		return fmt.Errorf("hybridparser: message too long")
 	}
+	msgLen := byte(len(msg))
 
 	switch h.SchemeID {
 	case hybrideds.DILITHIUM_ED25519_SPHINCS_COMPACT_ID:

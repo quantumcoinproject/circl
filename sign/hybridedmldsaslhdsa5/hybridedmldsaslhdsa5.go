@@ -112,7 +112,37 @@ func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 	priv.key = make([]byte, PrivateKeySize)
 	copy(priv.key, data)
 
+	if err := priv.checkConsistency(); err != nil {
+		return nil, err
+	}
+
 	return &priv, nil
+}
+
+// checkConsistency rejects a private key whose embedded Ed25519/ML-DSA public
+// components do not match the private material (e.g. a tampered or corrupted
+// import). The SLH-DSA root is not recomputed here (it would require full key
+// generation); an SLH-DSA mismatch is caught on first Verify.
+func (sk *PrivateKey) checkConsistency() error {
+	edPriv, mldsaPriv, _, err := sk.getPrivateKeys()
+	if err != nil {
+		return err
+	}
+	embeddedPub, err := sk.GetPublicKey()
+	if err != nil {
+		return err
+	}
+	edPub, mldsaPub, _, err := embeddedPub.getPublicKeys()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(ed25519.NewKeyFromSeed((*edPriv).Seed()).Public().(ed25519.PublicKey), *edPub) {
+		return errors.New("inconsistent private key: Ed25519 public key mismatch")
+	}
+	if !bytes.Equal(mldsaPriv.Public().(*mldsa87.PublicKey).Bytes(), mldsaPub.Bytes()) {
+		return errors.New("inconsistent private key: ML-DSA public key mismatch")
+	}
+	return nil
 }
 
 func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKey *mldsa87.PrivateKey, slhdsaPriKey *slhdsa.PrivateKey, err error) {
@@ -250,6 +280,9 @@ func NewKeyFromSeed(seed *[SeedSize]byte) (*PublicKey, *PrivateKey, error) {
 	return GenerateKey(seedBuff)
 }
 
+// Sign produces a FULL signature using all three components: Ed25519 + ML-DSA-87
+// + SLH-DSA (NIST level 5). This scheme intentionally has NO compact mode: every
+// signature is always the 3-of-3 hybrid.
 func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err error) {
 	if msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
 		return signature, errors.New("invalid message")
@@ -296,6 +329,8 @@ func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err e
 	return signature, nil
 }
 
+// Verify checks a FULL signature and by design requires all three components:
+// Ed25519 + ML-DSA-87 + SLH-DSA (NIST level 5). This scheme has no compact mode.
 func Verify(pk *PublicKey, msg []byte, signature []byte) bool {
 	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH || len(signature) != SigLength {
 		return false

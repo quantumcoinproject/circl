@@ -85,7 +85,7 @@ func (sig *unpackedSignature) Pack(buf []byte) {
 //
 // Returns whether buf contains a properly packed signature.
 func (sig *unpackedSignature) Unpack(buf []byte) bool {
-	if len(buf) < SignatureSize {
+	if len(buf) != SignatureSize {
 		return false
 	}
 	copy(sig.c[:], buf[:])

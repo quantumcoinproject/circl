@@ -86,6 +86,9 @@ func SignTo(sk *PrivateKey, msg, ctx []byte, randomized bool, sig []byte) error 
 
 func Sign(sk *PrivateKey, msg, ctx []byte, random io.Reader, sig []byte) error {
 	var rnd [32]byte
+	// crypto/rand.Reader.Read (Go 1.24+) always fills the buffer fully and never
+	// errors; a short read is only possible with a non-standard io.Reader passed
+	// by the caller.
 	_, err := random.Read(rnd[:])
 	if err != nil {
 		return err
