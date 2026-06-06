@@ -35,62 +35,14 @@ import (
 
 	"github.com/quantumcoinproject/circl/internal/sha3"
 	"github.com/quantumcoinproject/circl/kem"
-	"github.com/quantumcoinproject/circl/kem/kyber/kyber1024"
-	"github.com/quantumcoinproject/circl/kem/kyber/kyber512"
-	"github.com/quantumcoinproject/circl/kem/kyber/kyber768"
 	"github.com/quantumcoinproject/circl/kem/mlkem/mlkem768"
 )
 
 var ErrUninitialized = errors.New("public or private key not initialized")
 
-// Returns the hybrid KEM of Kyber512Draft00 and X25519.
-func Kyber512X25519() kem.Scheme { return kyber512X }
-
-// Returns the hybrid KEM of Kyber768Draft00 and X25519.
-func Kyber768X25519() kem.Scheme { return kyber768X }
-
-// Returns the hybrid KEM of Kyber768Draft00 and X448.
-func Kyber768X448() kem.Scheme { return kyber768X4 }
-
-// Returns the hybrid KEM of Kyber1024Draft00 and X448.
-func Kyber1024X448() kem.Scheme { return kyber1024X }
-
-// Returns the hybrid KEM of Kyber768Draft00 and P-256.
-func P256Kyber768Draft00() kem.Scheme { return p256Kyber768Draft00 }
-
 // Returns the hybrid KEM of ML-KEM-768 and X25519.
 // https://www.ietf.org/archive/id/draft-kwiatkowski-tls-ecdhe-mlkem-01.html
 func X25519MLKEM768() kem.Scheme { return xmlkem768 }
-
-var p256Kyber768Draft00 kem.Scheme = &scheme{
-	"P256Kyber768Draft00",
-	p256Kem,
-	kyber768.Scheme(),
-}
-
-var kyber512X kem.Scheme = &scheme{
-	"Kyber512-X25519",
-	x25519Kem,
-	kyber512.Scheme(),
-}
-
-var kyber768X kem.Scheme = &scheme{
-	"Kyber768-X25519",
-	x25519Kem,
-	kyber768.Scheme(),
-}
-
-var kyber768X4 kem.Scheme = &scheme{
-	"Kyber768-X448",
-	x448Kem,
-	kyber768.Scheme(),
-}
-
-var kyber1024X kem.Scheme = &scheme{
-	"Kyber1024-X448",
-	x448Kem,
-	kyber1024.Scheme(),
-}
 
 var xmlkem768 kem.Scheme = &scheme{
 	"X25519MLKEM768",

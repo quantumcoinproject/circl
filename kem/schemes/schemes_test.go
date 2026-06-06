@@ -9,7 +9,7 @@ import (
 )
 
 func TestCaseSensitivity(t *testing.T) {
-	if schemes.ByName("kyber512") != schemes.ByName("Kyber512") {
+	if schemes.ByName("ml-kem-512") != schemes.ByName("ML-KEM-512") {
 		t.Fatal()
 	}
 }
@@ -142,22 +142,8 @@ func Example_schemes() {
 		fmt.Println(sch.Name())
 	}
 	// Output:
-	// HPKE_KEM_P256_HKDF_SHA256
-	// HPKE_KEM_P384_HKDF_SHA384
-	// HPKE_KEM_P521_HKDF_SHA512
-	// HPKE_KEM_X25519_HKDF_SHA256
-	// HPKE_KEM_X448_HKDF_SHA512
-	// Kyber512
-	// Kyber768
-	// Kyber1024
 	// ML-KEM-512
 	// ML-KEM-768
 	// ML-KEM-1024
-	// Kyber512-X25519
-	// Kyber768-X25519
-	// Kyber768-X448
-	// Kyber1024-X448
-	// P256Kyber768Draft00
 	// X25519MLKEM768
-	// X-Wing
 }

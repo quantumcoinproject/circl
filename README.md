@@ -15,7 +15,7 @@ Curve Cryptography (ECC).
 
 This repository is a **fork of CIRCL** that adds **hybrid digital signature schemes** combining classical (Ed25519) and post-quantum (lattice-based and hash-based) components. Hybrid signatures reduce single-point-of-failure risk: if one algorithm family is broken — whether classical or PQC — the remaining components still protect authenticity. The [QuantumCoin blockchain](https://quantumcoin.org) uses these hybrid PQC signature schemes.
 
-### Hybrid schemes
+### Hybrid DSA Schemes
 
 | Scheme ID | Package | Mode | Components | PK + Sig | Verify ops/s¹ |
 |:---------:|---------|------|------------|----------|:-------------:|
@@ -54,30 +54,9 @@ Alternatively, look at the [Cloudflare Go](https://github.com/quantumcoinproject
 
 ## List of Algorithms
 
-[RFC-7748]: https://doi.org/10.17487/RFC7748
-[RFC-8032]: https://doi.org/10.17487/RFC8032
-[RFC-9180]: https://doi.org/10.17487/RFC9180
 [FIPS 202]: https://doi.org/10.6028/NIST.FIPS.202
 [FIPS 204]: https://doi.org/10.6028/NIST.FIPS.204
 [FIPS 205]: https://doi.org/10.6028/NIST.FIPS.205
-[FIPS 186-5]: https://doi.org/10.6028/NIST.FIPS.186-5
-
-### Elliptic Curve Cryptography
-
-| Diffie-Hellman Protocol |
-|:---:|
-
-- [X25519](./dh/x25519) and [X448](./dh/x448) functions. ([RFC-7748])
-
-| Digital Signature Schemes |
-|:---:|
-
-- [Ed25519](./sign/ed25519) signatures. ([RFC-8032])
-
-| High-Level Protocols |
-|:---:|
-
- - [HPKE](./hpke): Hybrid Public-Key Encryption ([RFC-9180])
 
 ### Post-Quantum Cryptography
 
@@ -85,8 +64,7 @@ Alternatively, look at the [Cloudflare Go](https://github.com/quantumcoinproject
 |:---:|
 
  - [ML-KEM](./kem/mlkem): modes 512, 768, 1024 ([FIPS-203](https://doi.org/10.6028/NIST.FIPS.203)).
- - [X-Wing](./kem/xwing) ([draft-connolly-cfrg-xwing-kem](https://datatracker.ietf.org/doc/draft-connolly-cfrg-xwing-kem/)).
- - [Kyber KEM](./kem/kyber): modes 512, 768, 1024 ([KYBER](https://pq-crystals.org/kyber/)).
+ - [X25519MLKEM768](./kem/hybrid): hybrid KEM of ML-KEM-768 and X25519 ([draft-kwiatkowski-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-kwiatkowski-tls-ecdhe-mlkem/)).
 
 | Digital Signature Schemes |
 |:---:|
@@ -116,7 +94,7 @@ Alternatively, look at the [Cloudflare Go](https://github.com/quantumcoinproject
 | Finite Fields |
 |:---:|
 
- - Fp25519, Fp448.
+ - Fp25519.
 
 ## Testing and Benchmarking
 

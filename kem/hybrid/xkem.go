@@ -6,7 +6,6 @@ import (
 	"crypto/subtle"
 
 	"github.com/quantumcoinproject/circl/dh/x25519"
-	"github.com/quantumcoinproject/circl/dh/x448"
 	"github.com/quantumcoinproject/circl/internal/sha3"
 	"github.com/quantumcoinproject/circl/kem"
 )
@@ -23,17 +22,12 @@ type xScheme struct {
 	size int
 }
 
-var (
-	x25519Kem = &xScheme{x25519.Size}
-	x448Kem   = &xScheme{x448.Size}
-)
+var x25519Kem = &xScheme{x25519.Size}
 
 func (sch *xScheme) Name() string {
 	switch sch.size {
 	case x25519.Size:
 		return "X25519"
-	case x448.Size:
-		return "X448"
 	}
 	panic(kem.ErrTypeMismatch)
 }
@@ -72,11 +66,6 @@ func (sk *xPrivateKey) Public() kem.PublicKey {
 		var sk2, pk2 x25519.Key
 		copy(sk2[:], sk.key)
 		x25519.KeyGen(&pk2, &sk2)
-		copy(pk.key, pk2[:])
-	case x448.Size:
-		var sk2, pk2 x448.Key
-		copy(sk2[:], sk.key)
-		x448.KeyGen(&pk2, &sk2)
 		copy(pk.key, pk2[:])
 	}
 	return &pk
@@ -142,14 +131,6 @@ func (pk *xPublicKey) X(sk *xPrivateKey) ([]byte, error) {
 		copy(pk2[:], pk.key)
 		copy(sk2[:], sk.key)
 		if !x25519.Shared(&ss2, &sk2, &pk2) {
-			return nil, kem.ErrPubKey
-		}
-		return ss2[:], nil
-	case x448.Size:
-		var ss2, pk2, sk2 x448.Key
-		copy(pk2[:], pk.key)
-		copy(sk2[:], sk.key)
-		if !x448.Shared(&ss2, &sk2, &pk2) {
 			return nil, kem.ErrPubKey
 		}
 		return ss2[:], nil
