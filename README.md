@@ -4,8 +4,7 @@
 
 **CIRCL** (Cloudflare Interoperable, Reusable Cryptographic Library) is a collection
 of cryptographic primitives written in Go. The goal of this library is to be used as a tool for
-experimental deployment of cryptographic algorithms targeting Post-Quantum (PQ) and Elliptic
-Curve Cryptography (ECC).
+experimental deployment of cryptographic algorithms targeting Post-Quantum (PQ) Cryptography.
 
 ## Security Disclaimer
 
@@ -69,7 +68,6 @@ Alternatively, look at the [Cloudflare Go](https://github.com/quantumcoinproject
 | Digital Signature Schemes |
 |:---:|
 
- - [Dilithium](./sign/dilithium): modes 2, 3, 5 ([Dilithium](https://pq-crystals.org/dilithium/)).
  - [ML-DSA](./sign/mldsa): modes 44, 65, 87 ([FIPS 204]).
  - [SLH-DSA](./sign/slhdsa): twelve parameter sets, pure and pre-hash signing ([FIPS 205]).
 
@@ -134,8 +132,7 @@ BibTeX Source
   abstract     = {{CIRCL (Cloudflare Interoperable, Reusable Cryptographic Library) is
                    a collection of cryptographic primitives written in Go. The goal
                    of this library is to be used as a tool for experimental
-                   deployment of cryptographic algorithms targeting Post-Quantum (PQ)
-                   and Elliptic Curve Cryptography (ECC).}},
+                   deployment of cryptographic algorithms targeting Post-Quantum (PQ)}},
   note         = {Available at \url{https://github.com/cloudflare/circl}. v1.6.1 Accessed Apr, 2025},
   month        = jun,
   year         = {2019}

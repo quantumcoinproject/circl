@@ -137,7 +137,37 @@ func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 	priv.key = make([]byte, PrivateKeySize)
 	copy(priv.key, data)
 
+	if err := priv.checkConsistency(); err != nil {
+		return nil, err
+	}
+
 	return &priv, nil
+}
+
+// checkConsistency rejects a private key whose embedded Ed25519/ML-DSA public
+// components do not match the private material (e.g. a tampered or corrupted
+// import). The SLH-DSA root is not recomputed here (it would require full key
+// generation); an SLH-DSA mismatch is caught on first Verify.
+func (sk *PrivateKey) checkConsistency() error {
+	edPriv, mldsaPriv, _, err := sk.getPrivateKeys()
+	if err != nil {
+		return err
+	}
+	embeddedPub, err := sk.GetPublicKey()
+	if err != nil {
+		return err
+	}
+	edPub, mldsaPub, _, err := embeddedPub.getPublicKeys()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(ed25519.NewKeyFromSeed((*edPriv).Seed()).Public().(ed25519.PublicKey), *edPub) {
+		return errors.New("inconsistent private key: Ed25519 public key mismatch")
+	}
+	if !bytes.Equal(mldsaPriv.Public().(*mldsa44.PublicKey).Bytes(), mldsaPub.Bytes()) {
+		return errors.New("inconsistent private key: ML-DSA public key mismatch")
+	}
+	return nil
 }
 
 func (sk *PrivateKey) getPrivateKeys() (edPriKey *ed25519.PrivateKey, mldsaPriKey *mldsa44.PrivateKey, slhdsaPriKey *slhdsa.PrivateKey, err error) {
@@ -275,6 +305,9 @@ func NewKeyFromSeed(seed *[SeedSize]byte) (*PublicKey, *PrivateKey, error) {
 	return GenerateKey(seedBuff)
 }
 
+// Sign produces a FULL signature using all three components: Ed25519 + ML-DSA-44
+// + SLH-DSA. This is the 3-of-3 hybrid and the strongest mode; prefer it over
+// SignCompact whenever the hash-based (SLH-DSA) layer is required.
 func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err error) {
 	if msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
 		return signature, errors.New("invalid message")
@@ -288,6 +321,9 @@ func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err e
 	}
 
 	var mldsaRnd [MLDSA44_SIG_RAND_LENGTH]byte
+	// crypto/rand.Reader.Read (Go 1.24+) always fills the buffer fully and never
+	// errors; a short read is only possible with a non-standard io.Reader passed
+	// by the caller.
 	_, err = rand.Read(mldsaRnd[:])
 	if err != nil {
 		return signature, err
@@ -320,6 +356,10 @@ func Sign(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err e
 	return signature, nil
 }
 
+// Verify checks a FULL signature and by design requires all three components to
+// be present and valid: Ed25519 + ML-DSA-44 + SLH-DSA. A compact signature will
+// not pass here (it carries a different scheme ID and length); use VerifyCompact
+// for compact signatures.
 func Verify(pk *PublicKey, msg []byte, signature []byte) bool {
 	if pk == nil || msg == nil || len(msg) != CRYPTO_MSG_LENGTH || len(signature) != SigLength {
 		return false
@@ -364,6 +404,12 @@ func Verify(pk *PublicKey, msg []byte, signature []byte) bool {
 	return true
 }
 
+// SignCompact produces a COMPACT signature: Ed25519 + ML-DSA-44 only (no
+// SLH-DSA component). By design this is a 2-of-3 hybrid whose post-quantum
+// security rests solely on ML-DSA; the SLH-DSA public key is bound into the
+// signed message so the SAME key pair can later produce full 3-of-3 signatures
+// (see VerifyCompact for the breakglass rationale). Use full Sign where the
+// SLH-DSA hash-based layer is required.
 func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte, err error) {
 	if msg == nil || len(msg) != CRYPTO_MSG_LENGTH {
 		return signature, errors.New("invalid message")
@@ -444,6 +490,22 @@ func SignCompact(priv *PrivateKey, rand io.Reader, msg []byte) (signature []byte
 	return signature, nil
 }
 
+// VerifyCompact verifies a COMPACT signature: Ed25519 + ML-DSA-44 only. By
+// design it does NOT verify an SLH-DSA signature (none is present in a compact
+// signature); the SLH-DSA public key is only bound into the signed message as a
+// future "breakglass" anchor.
+//
+// SECURITY/POLICY: a compact signature is therefore a 2-of-3 hybrid. Its
+// post-quantum security rests solely on ML-DSA. Callers (consensus/wallet) MUST
+// NOT treat compact as equivalent to a full signature, and SHOULD pin the
+// acceptable scheme ID(s) per account. Use full Verify where the SLH-DSA
+// hash-based layer is required.
+//
+// BREAKGLASS: if Ed25519 and/or ML-DSA are ever broken or suspected weak,
+// switch to the FULL mode (Sign/Verify) for new signatures. This requires NO
+// key regeneration: the SAME key pair already contains the SLH-DSA component,
+// so the existing key can immediately produce and verify full 3-of-3 signatures
+// that restore hash-based (SLH-DSA) protection.
 func VerifyCompact(pk *PublicKey, msg []byte, signature []byte) bool {
 	if pk == nil || msg == nil || signature == nil || len(msg) != CRYPTO_MSG_LENGTH || len(signature) != CompactSigLength {
 		return false

@@ -5,7 +5,7 @@
 // via WebAssembly. It wraps three underlying Go packages:
 //
 //   - hybridedmldsaslhdsa  (Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f) — "hybridedmldsaslhdsa"
-//   - hybridedmldsaslhdsa5 (Ed25519 + ML-DSA-87 + SLH-DSA-SHAKE-256s) — "hybridedmldsaslhds5"
+//   - hybridedmldsaslhdsa5 (Ed25519 + ML-DSA-87 + SLH-DSA-SHAKE-256s) — "hybridedmldsaslhdsa5"
 //   - hybrideds            (Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f) — "hybrideds"
 //
 // All schemes combine a classical signature (Ed25519) with two post-quantum
@@ -117,9 +117,25 @@ import (
 	hybrideds "github.com/quantumcoinproject/circl/sign/hybrideds"
 )
 
+// maxInputBytes is a ceiling on any byte-array argument, so a hostile JS caller
+// cannot force a huge allocation before the per-entrypoint length checks run.
+const maxInputBytes = 1 << 20 // 1 MiB
+
 // uint8ArrayToBytes converts a JavaScript Uint8Array (js.Value) into a Go []byte.
+//
+// Value.Get/Value.Int and js.CopyBytesToGo panic on the wrong JS type, so this
+// rejects anything that is not a Uint8Array (and anything over maxInputBytes) by
+// returning nil. Callers then hit their existing length / Unmarshal checks and
+// return a structured {error} instead of panicking the WASM instance.
 func uint8ArrayToBytes(v js.Value) []byte {
-	buf := make([]byte, v.Get("length").Int())
+	if v.Type() != js.TypeObject || !v.InstanceOf(js.Global().Get("Uint8Array")) {
+		return nil
+	}
+	n := v.Get("length").Int()
+	if n < 0 || n > maxInputBytes {
+		return nil
+	}
+	buf := make([]byte, n)
 	js.CopyBytesToGo(buf, v)
 	return buf
 }
@@ -153,6 +169,20 @@ func jsErrorStr(msg string) any {
 	obj.Set("result", js.Null())
 	obj.Set("error", msg)
 	return obj
+}
+
+// guard wraps an exported callback so that any panic (e.g. an unexpected JS
+// value type reaching a syscall/js call) is converted into a {error} result
+// instead of crashing the whole WASM instance. name is included for debugging.
+func guard(name string, fn func(js.Value, []js.Value) any) func(js.Value, []js.Value) any {
+	return func(this js.Value, args []js.Value) (res any) {
+		defer func() {
+			if r := recover(); r != nil {
+				res = jsErrorStr(fmt.Sprintf("%s: internal error: %v", name, r))
+			}
+		}()
+		return fn(this, args)
+	}
 }
 
 // checkArgs returns a jsErrorStr result if args is nil or has fewer than n
@@ -227,6 +257,9 @@ func hybridNewKeyFromSeed(_ js.Value, args []js.Value) any {
 		return errResult
 	}
 	seedBytes := uint8ArrayToBytes(args[0])
+	if msg, ok := checkExactLen("hybrid.newKeyFromSeed", "seed", len(seedBytes), hybrid.SeedSize); !ok {
+		return jsErrorStr(msg)
+	}
 	var seed [hybrid.SeedSize]byte
 	copy(seed[:], seedBytes)
 	pub, priv, err := hybrid.NewKeyFromSeed(&seed)
@@ -418,6 +451,9 @@ func hybridExpandSeed(_ js.Value, args []js.Value) any {
 		return errResult
 	}
 	baseSeedBytes := uint8ArrayToBytes(args[0])
+	if msg, ok := checkExactLen("hybrid.expandSeed", "baseSeed", len(baseSeedBytes), hybrid.BaseSeedSize); !ok {
+		return jsErrorStr(msg)
+	}
 	var baseSeed [hybrid.BaseSeedSize]byte
 	copy(baseSeed[:], baseSeedBytes)
 	expanded, err := hybrid.ExpandSeed(baseSeed)
@@ -463,6 +499,9 @@ func hybrid5NewKeyFromSeed(_ js.Value, args []js.Value) any {
 		return errResult
 	}
 	seedBytes := uint8ArrayToBytes(args[0])
+	if msg, ok := checkExactLen("hybrid5.newKeyFromSeed", "seed", len(seedBytes), hybrid5.SeedSize); !ok {
+		return jsErrorStr(msg)
+	}
 	var seed [hybrid5.SeedSize]byte
 	copy(seed[:], seedBytes)
 	pub, priv, err := hybrid5.NewKeyFromSeed(&seed)
@@ -609,6 +648,9 @@ func hybrid5ExpandSeed(_ js.Value, args []js.Value) any {
 		return errResult
 	}
 	baseSeedBytes := uint8ArrayToBytes(args[0])
+	if msg, ok := checkExactLen("hybrid5.expandSeed", "baseSeed", len(baseSeedBytes), hybrid5.BaseSeedSize); !ok {
+		return jsErrorStr(msg)
+	}
 	var baseSeed [hybrid5.BaseSeedSize]byte
 	copy(baseSeed[:], baseSeedBytes)
 	expanded, err := hybrid5.ExpandSeed(baseSeed)
@@ -648,6 +690,9 @@ func hybridedsNewKeyFromSeed(_ js.Value, args []js.Value) any {
 		return errResult
 	}
 	seedBytes := uint8ArrayToBytes(args[0])
+	if msg, ok := checkExactLen("hybrideds.newKeyFromSeed", "seed", len(seedBytes), hybrideds.SeedSize); !ok {
+		return jsErrorStr(msg)
+	}
 	var seed [hybrideds.SeedSize]byte
 	copy(seed[:], seedBytes)
 	pub, priv, err := hybrideds.NewKeyFromSeed(&seed)
@@ -804,6 +849,9 @@ func hybridedsExpandSeed(_ js.Value, args []js.Value) any {
 		return errResult
 	}
 	baseSeedBytes := uint8ArrayToBytes(args[0])
+	if msg, ok := checkExactLen("hybrideds.expandSeed", "baseSeed", len(baseSeedBytes), hybrideds.BaseSeedSize); !ok {
+		return jsErrorStr(msg)
+	}
 	var baseSeed [hybrideds.BaseSeedSize]byte
 	copy(baseSeed[:], baseSeedBytes)
 	expanded, err := hybrideds.ExpandSeed(baseSeed)
@@ -882,6 +930,9 @@ func cryptoRandom(_ js.Value, args []js.Value) any {
 	if errResult := checkArgs("cryptoRandom", args, 1); errResult != nil {
 		return errResult
 	}
+	if args[0].Type() != js.TypeNumber {
+		return jsErrorStr("cryptoRandom: size must be a number")
+	}
 	n := args[0].Int()
 	if n < 0 {
 		return jsErrorStr("cryptoRandom: size must be non-negative")
@@ -898,16 +949,16 @@ func cryptoRandom(_ js.Value, args []js.Value) any {
 
 func Register() {
 	hybridNS := js.Global().Get("Object").New()
-	hybridNS.Set("generateKey", js.FuncOf(hybridGenerateKey))
-	hybridNS.Set("newKeyFromSeed", js.FuncOf(hybridNewKeyFromSeed))
-	hybridNS.Set("sign", js.FuncOf(hybridSign))
-	hybridNS.Set("verify", js.FuncOf(hybridVerify))
-	hybridNS.Set("signCompact", js.FuncOf(hybridSignCompact))
-	hybridNS.Set("verifyCompact", js.FuncOf(hybridVerifyCompact))
-	hybridNS.Set("getPublicKey", js.FuncOf(hybridGetPublicKey))
-	hybridNS.Set("unmarshalPublicKey", js.FuncOf(hybridUnmarshalPublicKey))
-	hybridNS.Set("unmarshalPrivateKey", js.FuncOf(hybridUnmarshalPrivateKey))
-	hybridNS.Set("expandSeed", js.FuncOf(hybridExpandSeed))
+	hybridNS.Set("generateKey", js.FuncOf(guard("hybrid.generateKey", hybridGenerateKey)))
+	hybridNS.Set("newKeyFromSeed", js.FuncOf(guard("hybrid.newKeyFromSeed", hybridNewKeyFromSeed)))
+	hybridNS.Set("sign", js.FuncOf(guard("hybrid.sign", hybridSign)))
+	hybridNS.Set("verify", js.FuncOf(guard("hybrid.verify", hybridVerify)))
+	hybridNS.Set("signCompact", js.FuncOf(guard("hybrid.signCompact", hybridSignCompact)))
+	hybridNS.Set("verifyCompact", js.FuncOf(guard("hybrid.verifyCompact", hybridVerifyCompact)))
+	hybridNS.Set("getPublicKey", js.FuncOf(guard("hybrid.getPublicKey", hybridGetPublicKey)))
+	hybridNS.Set("unmarshalPublicKey", js.FuncOf(guard("hybrid.unmarshalPublicKey", hybridUnmarshalPublicKey)))
+	hybridNS.Set("unmarshalPrivateKey", js.FuncOf(guard("hybrid.unmarshalPrivateKey", hybridUnmarshalPrivateKey)))
+	hybridNS.Set("expandSeed", js.FuncOf(guard("hybrid.expandSeed", hybridExpandSeed)))
 	hybridNS.Set("PublicKeySize", hybrid.PublicKeySize)
 	hybridNS.Set("PrivateKeySize", hybrid.PrivateKeySize)
 	hybridNS.Set("SeedSize", hybrid.SeedSize)
@@ -917,14 +968,14 @@ func Register() {
 	hybridNS.Set("CryptoMsgLength", hybrid.CRYPTO_MSG_LENGTH)
 
 	hybrid5NS := js.Global().Get("Object").New()
-	hybrid5NS.Set("generateKey", js.FuncOf(hybrid5GenerateKey))
-	hybrid5NS.Set("newKeyFromSeed", js.FuncOf(hybrid5NewKeyFromSeed))
-	hybrid5NS.Set("sign", js.FuncOf(hybrid5Sign))
-	hybrid5NS.Set("verify", js.FuncOf(hybrid5Verify))
-	hybrid5NS.Set("getPublicKey", js.FuncOf(hybrid5GetPublicKey))
-	hybrid5NS.Set("unmarshalPublicKey", js.FuncOf(hybrid5UnmarshalPublicKey))
-	hybrid5NS.Set("unmarshalPrivateKey", js.FuncOf(hybrid5UnmarshalPrivateKey))
-	hybrid5NS.Set("expandSeed", js.FuncOf(hybrid5ExpandSeed))
+	hybrid5NS.Set("generateKey", js.FuncOf(guard("hybrid5.generateKey", hybrid5GenerateKey)))
+	hybrid5NS.Set("newKeyFromSeed", js.FuncOf(guard("hybrid5.newKeyFromSeed", hybrid5NewKeyFromSeed)))
+	hybrid5NS.Set("sign", js.FuncOf(guard("hybrid5.sign", hybrid5Sign)))
+	hybrid5NS.Set("verify", js.FuncOf(guard("hybrid5.verify", hybrid5Verify)))
+	hybrid5NS.Set("getPublicKey", js.FuncOf(guard("hybrid5.getPublicKey", hybrid5GetPublicKey)))
+	hybrid5NS.Set("unmarshalPublicKey", js.FuncOf(guard("hybrid5.unmarshalPublicKey", hybrid5UnmarshalPublicKey)))
+	hybrid5NS.Set("unmarshalPrivateKey", js.FuncOf(guard("hybrid5.unmarshalPrivateKey", hybrid5UnmarshalPrivateKey)))
+	hybrid5NS.Set("expandSeed", js.FuncOf(guard("hybrid5.expandSeed", hybrid5ExpandSeed)))
 	hybrid5NS.Set("PublicKeySize", hybrid5.PublicKeySize)
 	hybrid5NS.Set("PrivateKeySize", hybrid5.PrivateKeySize)
 	hybrid5NS.Set("SeedSize", hybrid5.SeedSize)
@@ -933,16 +984,16 @@ func Register() {
 	hybrid5NS.Set("CryptoMsgLength", hybrid5.CRYPTO_MSG_LENGTH)
 
 	hybridedsNS := js.Global().Get("Object").New()
-	hybridedsNS.Set("generateKey", js.FuncOf(hybridedsGenerateKey))
-	hybridedsNS.Set("newKeyFromSeed", js.FuncOf(hybridedsNewKeyFromSeed))
-	hybridedsNS.Set("sign", js.FuncOf(hybridedsSign))
-	hybridedsNS.Set("verify", js.FuncOf(hybridedsVerify))
-	hybridedsNS.Set("signCompact", js.FuncOf(hybridedsSignCompact))
-	hybridedsNS.Set("verifyCompact", js.FuncOf(hybridedsVerifyCompact))
-	hybridedsNS.Set("getPublicKey", js.FuncOf(hybridedsGetPublicKey))
-	hybridedsNS.Set("unmarshalPublicKey", js.FuncOf(hybridedsUnmarshalPublicKey))
-	hybridedsNS.Set("unmarshalPrivateKey", js.FuncOf(hybridedsUnmarshalPrivateKey))
-	hybridedsNS.Set("expandSeed", js.FuncOf(hybridedsExpandSeed))
+	hybridedsNS.Set("generateKey", js.FuncOf(guard("hybrideds.generateKey", hybridedsGenerateKey)))
+	hybridedsNS.Set("newKeyFromSeed", js.FuncOf(guard("hybrideds.newKeyFromSeed", hybridedsNewKeyFromSeed)))
+	hybridedsNS.Set("sign", js.FuncOf(guard("hybrideds.sign", hybridedsSign)))
+	hybridedsNS.Set("verify", js.FuncOf(guard("hybrideds.verify", hybridedsVerify)))
+	hybridedsNS.Set("signCompact", js.FuncOf(guard("hybrideds.signCompact", hybridedsSignCompact)))
+	hybridedsNS.Set("verifyCompact", js.FuncOf(guard("hybrideds.verifyCompact", hybridedsVerifyCompact)))
+	hybridedsNS.Set("getPublicKey", js.FuncOf(guard("hybrideds.getPublicKey", hybridedsGetPublicKey)))
+	hybridedsNS.Set("unmarshalPublicKey", js.FuncOf(guard("hybrideds.unmarshalPublicKey", hybridedsUnmarshalPublicKey)))
+	hybridedsNS.Set("unmarshalPrivateKey", js.FuncOf(guard("hybrideds.unmarshalPrivateKey", hybridedsUnmarshalPrivateKey)))
+	hybridedsNS.Set("expandSeed", js.FuncOf(guard("hybrideds.expandSeed", hybridedsExpandSeed)))
 	hybridedsNS.Set("PublicKeySize", hybrideds.PublicKeySize)
 	hybridedsNS.Set("PrivateKeySize", hybrideds.PrivateKeySize)
 	hybridedsNS.Set("SeedSize", hybrideds.SeedSize)
@@ -953,8 +1004,8 @@ func Register() {
 
 	circlNS := js.Global().Get("Object").New()
 	circlNS.Set("hybridedmldsaslhdsa", hybridNS)
-	circlNS.Set("hybridedmldsaslhds5", hybrid5NS)
+	circlNS.Set("hybridedmldsaslhdsa5", hybrid5NS)
 	circlNS.Set("hybrideds", hybridedsNS)
-	circlNS.Set("cryptoRandom", js.FuncOf(cryptoRandom))
+	circlNS.Set("cryptoRandom", js.FuncOf(guard("cryptoRandom", cryptoRandom)))
 	js.Global().Set("circl", circlNS)
 }
