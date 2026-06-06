@@ -30,7 +30,7 @@ jobs:
         export CGO_ENABLED=1
         export GOOS=js
         export GOARCH=wasm
-        go build -o ${{ github.workspace }}/build/wasm/circl.wasm ${{ github.workspace }}/sign/wasm/wasm.go
+        go build -o ${{ github.workspace }}/build/wasm/circl.wasm ${{ github.workspace }}/sign/wasm
     - name: Check Files
       run:  ls  ${{ github.workspace }}/build
     - name: Create Release
