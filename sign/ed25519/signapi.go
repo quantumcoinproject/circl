@@ -2,7 +2,9 @@ package ed25519
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/asn1"
+	"errors"
 
 	"github.com/quantumcoinproject/circl/sign"
 )
@@ -80,6 +82,13 @@ func (*scheme) UnmarshalBinaryPublicKey(buf []byte) (sign.PublicKey, error) {
 func (*scheme) UnmarshalBinaryPrivateKey(buf []byte) (sign.PrivateKey, error) {
 	if len(buf) < PrivateKeySize {
 		return nil, sign.ErrPrivKeySize
+	}
+	// Reject a private key whose stored public-key half is inconsistent with
+	// the seed; see UnmarshalPrivateKey for the rationale (deterministic-nonce
+	// fault attack on signAll).
+	expected := NewKeyFromSeed(buf[:SeedSize])
+	if subtle.ConstantTimeCompare(expected[SeedSize:], buf[SeedSize:PrivateKeySize]) != 1 {
+		return nil, errors.New("ed25519: public key half does not match seed")
 	}
 	priv := make(PrivateKey, PrivateKeySize)
 	copy(priv, buf[:PrivateKeySize])

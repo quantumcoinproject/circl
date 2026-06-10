@@ -144,9 +144,21 @@ func UnmarshalPublicKey(data []byte) (*PublicKey, error) {
 }
 
 // Unpacks the private key from data.
+//
+// It validates that the embedded public-key half (data[SeedSize:]) is
+// consistent with the public key derived from the seed (data[:SeedSize]).
+// Accepting an inconsistent private key would make signing vulnerable to a
+// deterministic-nonce fault attack: signAll derives the nonce from the seed
+// but computes the challenge from the stored public-key half, so two
+// signatures over the same message under the same seed but different public
+// halves share R and leak the secret scalar.
 func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 	if len(data) != PrivateKeySize {
 		return nil, errors.New(fmt.Sprintf("packed private key must be of %d bytes", PrivateKeySize))
+	}
+	expected := NewKeyFromSeed(data[:SeedSize])
+	if subtle.ConstantTimeCompare(expected[SeedSize:], data[SeedSize:]) != 1 {
+		return nil, errors.New("ed25519: public key half does not match seed")
 	}
 	privateKey := make(PrivateKey, PrivateKeySize)
 	copy(privateKey, data)
