@@ -96,14 +96,14 @@
 //	circl.hybridedmldsaslhdsa.SeedSize           // 160  — byte length of expanded seed for newKeyFromSeed
 //	circl.hybridedmldsaslhdsa.BaseSeedSize       // 64   — byte length of base seed for expandSeed
 //	circl.hybridedmldsaslhdsa.SigLength          // 52374 — byte length of a full signature
-//	circl.hybridedmldsaslhdsa.CompactSigLength   // 2517 — byte length of a compact signature
+//	circl.hybridedmldsaslhdsa.CompactSigLength   // 2518 — byte length of a compact signature
 //	circl.hybridedmldsaslhdsa.CryptoMsgLength    // 32   — required message length
 //
 //	circl.hybridedmldsaslhdsa5.PublicKeySize     // 2688 — byte length of a hybrid5 public key
 //	circl.hybridedmldsaslhdsa5.PrivateKeySize    // 7680 — byte length of a hybrid5 private key
 //	circl.hybridedmldsaslhdsa5.SeedSize          // 160  — byte length of expanded seed for newKeyFromSeed
 //	circl.hybridedmldsaslhdsa5.BaseSeedSize      // 72   — byte length of base seed for expandSeed
-//	circl.hybridedmldsaslhdsa5.SigLength         // 34486 — byte length of a full signature
+//	circl.hybridedmldsaslhdsa5.SigLength         // 34517 — byte length of a full signature
 //	circl.hybridedmldsaslhdsa5.CryptoMsgLength   // 32   — required message length
 package wasm
 
