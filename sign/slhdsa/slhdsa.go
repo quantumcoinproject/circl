@@ -142,10 +142,7 @@ func readRandom(random io.Reader, size uint32) (out []byte, err error) {
 	if random == nil {
 		random = rand.Reader
 	}
-	// crypto/rand.Reader.Read (Go 1.24+) always fills the buffer fully and never
-	// errors; a short read is only possible with a non-standard io.Reader passed
-	// by the caller, which production paths do not do.
-	_, err = random.Read(out)
+	_, err = io.ReadFull(random, out)
 	return
 }
 
