@@ -106,14 +106,27 @@ var ErrVerificationFailed = errors.New("hybridparser: hybrid signature verificat
 
 // Component name constants for the PublicKeys and Signatures maps in HybridSignature.
 // Use these when reading or writing parsed component data for audit tooling.
+//
+// The names are spelled as the standard that defines each algorithm spells
+// them, so that anything quoting them -- an explorer, a CLI, an audit report --
+// matches the specification a reader would look it up in:
+//
+//	ML-DSA-44, ML-DSA-87           FIPS 204, which names parameter sets ML-DSA-{44,65,87}
+//	SLH-DSA-SHAKE-256{f,s}         FIPS 205, SLH-DSA-{SHA2,SHAKE}-{128,192,256}{s,f}
+//	Ed25519                        RFC 8032 (capital E, lowercase d)
+//	SPHINCS+-SHAKE-256f            the SPHINCS+ submission
+//	Dilithium                      CRYSTALS-Dilithium, the pre-standardisation name
+//
+// These strings appear in SchemeName and as map keys, so changing them is a
+// visible API change for callers that match on the text.
 const (
-	ComponentEd25519          = "ed25519"
-	ComponentDilithium       = "Dilithium"
-	ComponentSphincsSHAKE256f = "sphincs+ SHAKE-256f"
-	ComponentMLDSA44         = "mldsa44"
-	ComponentMLDSA87         = "mldsa87"
-	ComponentSLHDSA_SHAKE256f = "slhdsa SHAKE-256f"
-	ComponentSLHDSA_SHAKE256s = "slhdsa SHAKE-256s"
+	ComponentEd25519          = "Ed25519"
+	ComponentDilithium        = "Dilithium"
+	ComponentSphincsSHAKE256f = "SPHINCS+-SHAKE-256f"
+	ComponentMLDSA44          = "ML-DSA-44"
+	ComponentMLDSA87          = "ML-DSA-87"
+	ComponentSLHDSA_SHAKE256f = "SLH-DSA-SHAKE-256f"
+	ComponentSLHDSA_SHAKE256s = "SLH-DSA-SHAKE-256s"
 )
 
 // Keys for the AdditionalData map (scheme 1 only). Use when reading or writing
