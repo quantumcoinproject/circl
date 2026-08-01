@@ -71,7 +71,8 @@ func (*scheme) DeriveKey(seed []byte) (sign.PublicKey, sign.PrivateKey) {
 }
 
 func (*scheme) UnmarshalBinaryPublicKey(buf []byte) (sign.PublicKey, error) {
-	if len(buf) < PublicKeySize {
+	// NOTE Old version of CIRCL accepted trailing data.
+	if len(buf) != PublicKeySize {
 		return nil, sign.ErrPubKeySize
 	}
 	pub := make(PublicKey, PublicKeySize)
@@ -80,7 +81,8 @@ func (*scheme) UnmarshalBinaryPublicKey(buf []byte) (sign.PublicKey, error) {
 }
 
 func (*scheme) UnmarshalBinaryPrivateKey(buf []byte) (sign.PrivateKey, error) {
-	if len(buf) < PrivateKeySize {
+	// NOTE Old version of CIRCL accepted trailing data.
+	if len(buf) != PrivateKeySize {
 		return nil, sign.ErrPrivKeySize
 	}
 	// Reject a private key whose stored public-key half is inconsistent with
