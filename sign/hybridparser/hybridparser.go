@@ -114,14 +114,21 @@ var ErrVerificationFailed = errors.New("hybridparser: hybrid signature verificat
 //	ML-DSA-44, ML-DSA-87           FIPS 204, which names parameter sets ML-DSA-{44,65,87}
 //	SLH-DSA-SHAKE-256{f,s}         FIPS 205, SLH-DSA-{SHA2,SHAKE}-{128,192,256}{s,f}
 //	Ed25519                        RFC 8032 (capital E, lowercase d)
-//	SPHINCS+-SHAKE-256f            the SPHINCS+ submission
-//	Dilithium                      CRYSTALS-Dilithium, the pre-standardisation name
+//	SPHINCS+-SHAKE-256f            the SPHINCS+ submission, whose parameter sets
+//	                               are SPHINCS+-{SHA2,SHAKE}-{128,192,256}{s,f}
+//	Dilithium2                     the CRYSTALS-Dilithium submission, whose
+//	                               parameter sets are Dilithium{2,3,5}
+//
+// Every name carries its parameter set, so none of them is ambiguous about the
+// security level in use. Dilithium2 is the level-2 set that FIPS 204 went on to
+// standardise as ML-DSA-44 -- schemes 1 and 2 use the 1312-byte public key and
+// 2420-byte signature of exactly that set.
 //
 // These strings appear in SchemeName and as map keys, so changing them is a
 // visible API change for callers that match on the text.
 const (
 	ComponentEd25519          = "Ed25519"
-	ComponentDilithium        = "Dilithium"
+	ComponentDilithium        = "Dilithium2"
 	ComponentSphincsSHAKE256f = "SPHINCS+-SHAKE-256f"
 	ComponentMLDSA44          = "ML-DSA-44"
 	ComponentMLDSA87          = "ML-DSA-87"
@@ -155,8 +162,16 @@ type HybridSignature struct {
 	// Use this field in audit logic to dispatch to the correct NIST/FIPS component checks.
 	SchemeID byte
 
-	// SchemeName is the component names in order (mldsa, slhdsa, ed25519), separated by " + ".
-	// For older schemes (1 and 2), Dilithium and SPHINCS+ names are used respectively.
+	// SchemeName is the component names joined with " + ", each spelled the way
+	// its defining standard spells it (the Component* constants), with
+	// " (compact)" appended for compact schemes:
+	//
+	//	"ML-DSA-44 + SLH-DSA-SHAKE-256f + Ed25519 (compact)"   scheme 3
+	//	"ML-DSA-44 + SLH-DSA-SHAKE-256f + Ed25519"             scheme 4
+	//	"ML-DSA-87 + SLH-DSA-SHAKE-256s + Ed25519"             scheme 5
+	//
+	// Older schemes (1 and 2) use the pre-standardisation Dilithium and
+	// SPHINCS+ names in the same positions.
 	SchemeName string
 
 	// Context is the hex-encoded context string used during verification.
