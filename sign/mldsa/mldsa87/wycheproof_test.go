@@ -3,6 +3,8 @@ package mldsa87
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/quantumcoinproject/circl/internal/test"
 )
 
 // Wycheproof ML-DSA signature-verification vectors from the C2SP/wycheproof
@@ -10,7 +12,7 @@ import (
 // negative cases such as malleated hint encodings, infinity-norm violations,
 // incorrect public-key/signature lengths and over-long contexts.
 func TestWycheproofVerify(t *testing.T) {
-	buf, err := readGzip("../testdata/mldsa_87_verify_test.json.gz")
+	buf, err := test.ReadGzip("../testdata/mldsa_87_verify_test.json.gz")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,16 +20,16 @@ func TestWycheproofVerify(t *testing.T) {
 	var vectors struct {
 		Algorithm  string `json:"algorithm"`
 		TestGroups []struct {
-			Type      string   `json:"type"`
-			PublicKey HexBytes `json:"publicKey"`
+			Type      string        `json:"type"`
+			PublicKey test.HexBytes `json:"publicKey"`
 			Tests     []struct {
-				TcID    int      `json:"tcId"`
-				Comment string   `json:"comment"`
-				Msg     HexBytes `json:"msg"`
-				Ctx     HexBytes `json:"ctx"`
-				Sig     HexBytes `json:"sig"`
-				Result  string   `json:"result"`
-				Flags   []string `json:"flags"`
+				TcID    int           `json:"tcId"`
+				Comment string        `json:"comment"`
+				Msg     test.HexBytes `json:"msg"`
+				Ctx     test.HexBytes `json:"ctx"`
+				Sig     test.HexBytes `json:"sig"`
+				Result  string        `json:"result"`
+				Flags   []string      `json:"flags"`
 			} `json:"tests"`
 		} `json:"testGroups"`
 	}
