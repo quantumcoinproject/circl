@@ -12,6 +12,19 @@ experimental deployment of cryptographic algorithms targeting Post-Quantum (PQ) 
 
 ⚠️ Upstream CIRCL warns that not every package is constant time. The experimental packages flagged by upstream as leaking timing information (`group/`, `oprf/`, `blindsign/`, `secretsharing/`, `tss/rsa/`, `zk/`, `ecc/p384/`) have all been removed from this fork; the packages retained here are implemented to be constant time in their core operations.
 
+## Intended Scope — Important
+
+🔒 **This fork is purpose-built for [QuantumCoin blockchain](https://quantumcoin.org) and is not offered as a general-purpose cryptographic library.**
+
+It is supported only for building and operating QuantumCoin nodes, wallets, dApps and tooling. Every design decision, security review and applicability assessment in this repository assumes that narrow deployment context. Concretely, this means:
+
+- **Analysis is scoped to known consumers.** The security review in [`SECURITY_AUDIT.md`](./SECURITY_AUDIT.md) establishes whether each finding is reachable by tracing call sites in the QuantumCoin node and SDKs at specific commits. Those conclusions are evidence about *those* consumers, not general statements about the library.
+- **The schemes depend on caller-side invariants.** The hybrid signature schemes rely on properties the library does not itself enforce — for example that identity is derived from a hash of the *complete* composite public key, that messages are exactly 32 bytes, and that randomness comes from a CSPRNG. These hold in QuantumCoin software; they are not guaranteed for arbitrary callers. The [audit index](./SECURITY_AUDIT.md) lists them explicitly.
+- **Some schemes implement pre-standardization drafts.** Schemes 1–2 realize Round 3 Dilithium2 and SPHINCS+, not the finalized FIPS 204 / FIPS 205 algorithms, and are retained for wallet backward compatibility.
+- **No FIPS conformance or CMVP validation is claimed** for any part of this fork.
+
+If you need general-purpose post-quantum cryptography in Go, use [upstream Cloudflare CIRCL](https://github.com/cloudflare/circl) rather than this fork.
+
 ## About This Fork: Hybrid Signature Schemes
 
 This repository is a **fork of CIRCL** that adds **hybrid digital signature schemes** combining classical (Ed25519) and post-quantum (lattice-based and hash-based) components. Hybrid signatures reduce single-point-of-failure risk: if one algorithm family is broken — whether classical or PQC — the remaining components still protect authenticity. The [QuantumCoin blockchain](https://quantumcoin.org) uses these hybrid PQC signature schemes.
@@ -42,6 +55,21 @@ For **audit, validation, and independent per-component verification** of hybrid 
 - **CheckHybrid**: reconstruct and verify using both the composite hybrid verifier and each component's verifier.
 
 The [hybridparser README](./sign/hybridparser/README.md) describes how to decode the hex components and pass them to external DSA implementations for conformance audits against FIPS 204, FIPS 205, and FIPS 186-5. **Use hybridparser for audit and tooling only; production verification must use each hybrid scheme's own APIs.**
+
+## Security Audit
+
+This fork maintains an ongoing internal security review of the hybrid signature schemes and their supporting code. Results are published in [`SECURITY_AUDIT.md`](./SECURITY_AUDIT.md), with detailed write-ups in [`audit/`](./audit), rather than kept private, so that integrators and external reviewers can see what has been examined, what was found, and what remains open.
+
+**Start with the [audit index](./SECURITY_AUDIT.md).** It lists every recorded finding with its severity, links to the detailed write-ups, and — separately from severity — states whether each issue is actually reachable in the library's intended consumers.
+
+A few conventions worth knowing:
+
+- Findings are only recorded once **confirmed by executing code**, never by inspection alone. Anything that could not be reproduced is discarded rather than listed speculatively.
+- Severity and reachability are rated on **two independent axes**, each with published criteria, so ratings are reproducible rather than intuitive. Severity describes the defect in the code itself, judged without assuming any particular caller; reachability describes whether a supported consumer API can actually trigger it, pinned to specific consumer commits. Deliberately separating them means a genuine defect is neither overstated nor dismissed merely because no current consumer reaches it — the index states both directions explicitly.
+- Findings carry a [CWE](https://cwe.mitre.org/) classification where one fits, and the reachability axis follows [VEX](https://github.com/openvex/spec) justification semantics.
+- Where practical, findings ship with **executable tests** in the affected package, so each documented issue can be independently reproduced and so that a future fix produces a visible signal.
+
+Please continue to report security issues through our [Security Policy](https://github.com/quantumcoinproject/circl/security/policy); the audit directory documents review findings and is not a substitute for coordinated disclosure.
 
 ## Installation
 
