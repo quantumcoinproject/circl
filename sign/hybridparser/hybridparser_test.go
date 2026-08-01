@@ -548,3 +548,120 @@ func TestCheckHybridRejectsOverlongMessage(t *testing.T) {
 		}
 	}
 }
+
+// TestParseHybrid_SchemeNamesExact pins the exact SchemeName string and the
+// exact per-component map keys for every scheme. These strings are quoted
+// verbatim by downstream consumers -- block explorers, audit reports, the
+// QuantumCoin node's eth_getTransactionSignature -- so a drift here (say, a
+// constant reverting to a short "mldsa44"-style spelling) must fail THIS
+// repository's tests, not only be discovered downstream. The spellings follow
+// the defining standards: FIPS 204 (ML-DSA-44/-87), FIPS 205
+// (SLH-DSA-SHAKE-256f/s), RFC 8032 (Ed25519), and the pre-standardisation
+// names for schemes 1-2.
+func TestParseHybrid_SchemeNamesExact(t *testing.T) {
+	cases := []struct {
+		name     string
+		wantName string
+		wantKeys []string
+		run      func() (*HybridSignature, error)
+	}{
+		{
+			name:     "scheme1",
+			wantName: "Dilithium2 + SPHINCS+-SHAKE-256f + Ed25519 (compact)",
+			wantKeys: []string{ComponentEd25519, ComponentDilithium},
+			run: func() (*HybridSignature, error) {
+				pub, priv, _ := hybrideds.NewKeyFromSeed(&seedEDS)
+				sig, err := hybrideds.SignCompact(priv, deterministicReader(0), testMsg[:])
+				if err != nil {
+					return nil, err
+				}
+				pubBytes, _ := pub.MarshalBinary()
+				return ParseHybrid(sig, pubBytes, testMsg[:])
+			},
+		},
+		{
+			name:     "scheme2",
+			wantName: "Dilithium2 + SPHINCS+-SHAKE-256f + Ed25519",
+			wantKeys: []string{ComponentEd25519, ComponentDilithium, ComponentSphincsSHAKE256f},
+			run: func() (*HybridSignature, error) {
+				pub, priv, _ := hybrideds.NewKeyFromSeed(&seedEDS)
+				sig, err := hybrideds.Sign(priv, deterministicReader(0), testMsg[:])
+				if err != nil {
+					return nil, err
+				}
+				pubBytes, _ := pub.MarshalBinary()
+				return ParseHybrid(sig, pubBytes, testMsg[:])
+			},
+		},
+		{
+			name:     "scheme3",
+			wantName: "ML-DSA-44 + SLH-DSA-SHAKE-256f + Ed25519 (compact)",
+			wantKeys: []string{ComponentEd25519, ComponentMLDSA44},
+			run: func() (*HybridSignature, error) {
+				pub, priv, _ := hybridedmldsaslhdsa.NewKeyFromSeed(&seedEDMLDSA)
+				sig, err := hybridedmldsaslhdsa.SignCompact(priv, deterministicReader(0), testMsg[:])
+				if err != nil {
+					return nil, err
+				}
+				pubBytes, _ := pub.MarshalBinary()
+				return ParseHybrid(sig, pubBytes, testMsg[:])
+			},
+		},
+		{
+			name:     "scheme4",
+			wantName: "ML-DSA-44 + SLH-DSA-SHAKE-256f + Ed25519",
+			wantKeys: []string{ComponentEd25519, ComponentMLDSA44, ComponentSLHDSA_SHAKE256f},
+			run: func() (*HybridSignature, error) {
+				pub, priv, _ := hybridedmldsaslhdsa.NewKeyFromSeed(&seedEDMLDSA)
+				sig, err := hybridedmldsaslhdsa.Sign(priv, deterministicReader(0), testMsg[:])
+				if err != nil {
+					return nil, err
+				}
+				pubBytes, _ := pub.MarshalBinary()
+				return ParseHybrid(sig, pubBytes, testMsg[:])
+			},
+		},
+		{
+			name:     "scheme5",
+			wantName: "ML-DSA-87 + SLH-DSA-SHAKE-256s + Ed25519",
+			wantKeys: []string{ComponentEd25519, ComponentMLDSA87, ComponentSLHDSA_SHAKE256s},
+			run: func() (*HybridSignature, error) {
+				pub, priv, _ := hybridedmldsaslhdsa5.NewKeyFromSeed(&seedEDMLDSA5)
+				sig, err := hybridedmldsaslhdsa5.Sign(priv, deterministicReader(0), testMsg[:])
+				if err != nil {
+					return nil, err
+				}
+				pubBytes, _ := pub.MarshalBinary()
+				return ParseHybrid(sig, pubBytes, testMsg[:])
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			parsed, err := tc.run()
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if parsed.SchemeName != tc.wantName {
+				t.Errorf("SchemeName = %q, want %q", parsed.SchemeName, tc.wantName)
+			}
+			for _, key := range tc.wantKeys {
+				if _, ok := parsed.Signatures[key]; !ok {
+					t.Errorf("Signatures map missing key %q (has %v)", key, mapKeys(parsed.Signatures))
+				}
+			}
+			if len(parsed.Signatures) != len(tc.wantKeys) {
+				t.Errorf("Signatures has %d entries, want %d", len(parsed.Signatures), len(tc.wantKeys))
+			}
+		})
+	}
+}
+
+// mapKeys lists a map's keys for error messages.
+func mapKeys(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}

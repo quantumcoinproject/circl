@@ -18,8 +18,8 @@ This repository is a **fork of CIRCL** that adds **hybrid digital signature sche
 
 | Scheme ID | Package | Mode | Components | PK + Sig | Verify ops/s¹ |
 |:---------:|---------|------|------------|----------|:-------------:|
-| 1 | [hybrideds](./sign/hybrideds) | Compact | Ed25519 + Dilithium (SPHINCS+ key present, not signed) | 3,966 B | ~10,970 |
-| 2 | [hybrideds](./sign/hybrideds) | Full | Ed25519 + Dilithium + SPHINCS+-SHAKE-256f | 53,782 B | ~270 |
+| 1 | [hybrideds](./sign/hybrideds) | Compact | Ed25519 + Dilithium2 (SPHINCS+ key present, not signed) | 3,966 B | ~10,970 |
+| 2 | [hybrideds](./sign/hybrideds) | Full | Ed25519 + Dilithium2 + SPHINCS+-SHAKE-256f | 53,782 B | ~270 |
 | 3 | [hybridedmldsaslhdsa](./sign/hybridedmldsaslhdsa) | Compact | Ed25519 + ML-DSA-44 (SLH-DSA key present, not signed) | 3,926 B | ~9,980 |
 | 4 | [hybridedmldsaslhdsa](./sign/hybridedmldsaslhdsa) | Full | Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f | 53,782 B | ~290 |
 | 5 | [hybridedmldsaslhdsa5](./sign/hybridedmldsaslhdsa5) | Full | Ed25519 + ML-DSA-87 + SLH-DSA-SHAKE-256s (NIST Level 5) | 37,205 B | ~470 |

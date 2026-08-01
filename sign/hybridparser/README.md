@@ -81,7 +81,7 @@ Use these as keys when reading from `HybridSignature.PublicKeys` and `HybridSign
 | Constant | Description |
 |----------|-------------|
 | `ComponentEd25519` | Ed25519 |
-| `ComponentDilithium` | Dilithium (HybridEds) |
+| `ComponentDilithium` | Dilithium2 (HybridEds) |
 | `ComponentSphincsSHAKE256f` | SPHINCS+-SHAKE-256f (HybridEds) |
 | `ComponentMLDSA44` | ML-DSA-44 |
 | `ComponentMLDSA87` | ML-DSA-87 |
@@ -95,7 +95,7 @@ Result of verifying and parsing a hybrid signature, **for audit and understandin
 | Field | Description |
 |-------|-------------|
 | **SchemeID** | Hybrid scheme identifier from the first byte of the raw signature (1–5). Use in audit logic to dispatch to the correct NIST/FIPS component checks. See table below. |
-| **SchemeName** | Single string listing component names in order (ML-DSA / Dilithium, SLH-DSA / SPHINCS+, Ed25519), separated by `" + "`. For schemes 1–2 the names are Dilithium and SPHINCS+; for 3–5 they are the ML-DSA and SLH-DSA variant names. Compact schemes (1 and 3) include the suffix `" (compact)"`. Example: `"ML-DSA-44 + SLH-DSA-SHAKE-256f + Ed25519 (compact)"`. |
+| **SchemeName** | Single string listing component names in order (ML-DSA / Dilithium, SLH-DSA / SPHINCS+, Ed25519), separated by `" + "`. For schemes 1–2 the names are Dilithium2 and SPHINCS+-SHAKE-256f; for 3–5 they are the ML-DSA and SLH-DSA variant names. Every name carries its parameter set. Compact schemes (1 and 3) include the suffix `" (compact)"`. Example: `"ML-DSA-44 + SLH-DSA-SHAKE-256f + Ed25519 (compact)"`. |
 | **Context** | Hex-encoded context byte string used when verifying ML-DSA and SLH-DSA components. **Scheme 3 (compact):** `SchemeID (1 byte) \|\| SLH-DSA public key`. **Schemes 4 and 5 (full):** single byte equal to `SchemeID`. Empty for schemes 1 and 2 (they do not use context in the same way). `CheckHybrid` verifies that this field matches the expected context for the scheme. |
 | **AdditionalData** | Map of scheme-specific extra fields (hex-encoded). For **scheme 1 (compact)** only, it contains three keys; nil or empty for all other schemes. Use the `AdditionalData*` constants as keys. **Keys:** * **Scheme1Nonce** — 40-byte nonce; required to reconstruct and re-verify scheme 1. * **Scheme1Mu** — Message μ: concatenation `Scheme1Nonce \|\| message \|\| SPHINCS+ public key`; Ed25519 and Dilithium sign the digest of μ. * **Scheme1Digest** — Digest `SHA3-512(μ)` (what is actually signed). `CheckHybrid` verifies that Scheme1Mu and Scheme1Digest match the expected values when re-verifying scheme 1. |
 | **Message** | Hex-encoded message that was signed (common to all components). For scheme 1 (compact), the value actually signed by Ed25519 and Dilithium is `SHA3-512(nonce\|\|message\|\|SPHINCS+ public key)`; this field holds the **original** message. |
@@ -118,7 +118,7 @@ In other words: **Message** is the original data; **Scheme1Mu** is the construct
 
 | SchemeID | Scheme | Components |
 |:--------:|--------|------------|
-| 1 | hybrideds compact | Ed25519 + Dilithium (SPHINCS+ key present but not signed in compact) |
+| 1 | hybrideds compact | Ed25519 + Dilithium2 (SPHINCS+ key present but not signed in compact) |
 | 2 | hybrideds full | Ed25519 + Dilithium + SPHINCS+-SHAKE-256f |
 | 3 | hybrid Ed25519-ML-DSA-SLH-DSA compact | Ed25519 + ML-DSA-44 (SLH-DSA-SHAKE-256f key present) |
 | 4 | hybrid Ed25519-ML-DSA-SLH-DSA full | Ed25519 + ML-DSA-44 + SLH-DSA-SHAKE-256f |
