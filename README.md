@@ -10,6 +10,8 @@ experimental deployment of cryptographic algorithms targeting Post-Quantum (PQ) 
 
 🚨 This library is offered as-is, and without a guarantee. Therefore, it is expected that changes in the code, repository, and API occur in the future. We recommend to take caution before using this library in a production application since part of its content is experimental. All security issues must be reported, please notify us immediately following the instructions given in our [Security Policy](https://github.com/quantumcoinproject/circl/security/policy).
 
+⚠️ Upstream CIRCL warns that not every package is constant time. The experimental packages flagged by upstream as leaking timing information (`group/`, `oprf/`, `blindsign/`, `secretsharing/`, `tss/rsa/`, `zk/`, `ecc/p384/`) have all been removed from this fork; the packages retained here are implemented to be constant time in their core operations.
+
 ## About This Fork: Hybrid Signature Schemes
 
 This repository is a **fork of CIRCL** that adds **hybrid digital signature schemes** combining classical (Ed25519) and post-quantum (lattice-based and hash-based) components. Hybrid signatures reduce single-point-of-failure risk: if one algorithm family is broken — whether classical or PQC — the remaining components still protect authenticity. The [QuantumCoin blockchain](https://quantumcoin.org) uses these hybrid PQC signature schemes.
