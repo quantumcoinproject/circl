@@ -35,12 +35,11 @@ supplied by the callers rather than by the scheme.
 
 ## Note on the severity rating
 
-This finding was initially recorded as Low. It is rated **Medium** under the methodology
-declared in [SECURITY_AUDIT.md](../SECURITY_AUDIT.md#methodology), which places any violation of a
-beyond-unforgeability hardening notion at that level — the same class as FINDING-002, which was
-already Medium. The re-rating resolves an inconsistency between two findings of identical class;
-**no technical claim has changed**, and the "not exploitable in any consumer" conclusion below
-stands unaltered.
+Rated **Medium** under the methodology declared in
+[SECURITY_AUDIT.md](../SECURITY_AUDIT.md#methodology), which places any violation of a
+beyond-unforgeability hardening notion at that level. This is the same class as
+[FINDING-002](FINDING-002-cross-mode-separation.md), which is rated identically — both concern
+something the construction fails to bind, not a break of unforgeability itself.
 
 Per the precedence rule in the methodology, the label is a triage aid: the authoritative content
 of this finding is the security notion violated and the bounded adversarial capability set out
