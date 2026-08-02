@@ -23,7 +23,7 @@ are not guaranteed for an arbitrary caller. In particular:
 | derives identity from a hash of the **complete** composite public key, never a component or prefix | a component signature can be transplanted into a different composite key ([FINDING-001](../audit/FINDING-001-key-substitution.md)) |
 | passes messages of **exactly** 32 bytes | mode separation in `hybrideds` rests on a payload-length asymmetry ([FINDING-002](../audit/FINDING-002-cross-mode-separation.md)) |
 | supplies randomness from a **CSPRNG**, never `nil` and never a short-reading reader | silently degraded hedging randomness; a `nil` reader panics |
-| supplies base seeds that are **uniformly random across every byte position** | the legacy `hybrideds` expander reads only 64 of its 96 input bytes ([FINDING-000](../audit/FINDING-000-seed-expander-entropy.md)) |
+| supplies base seeds that are **uniformly random across every byte position**, and does **not** treat a seed phrase as a unique wallet identifier | the legacy `hybrideds` expander reads only 64 of its 96 input bytes, so the seed → wallet map is 2²⁵⁶-to-1: distinct 48-word phrases open the same wallet, silently ([FINDING-000](../audit/FINDING-000-seed-expander-entropy.md)) |
 | pins an acceptable **scheme ID per account** | compact and full signatures become fungible, and compact carries no hash-based protection ([FINDING-008](../SECURITY_AUDIT.md#finding-008)) |
 | never reuses a component key outside the hybrid | the Ed25519 component is a valid standalone RFC 8032 signature over the message |
 

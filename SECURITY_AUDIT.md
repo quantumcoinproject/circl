@@ -15,7 +15,7 @@ where they meet the inherited CIRCL primitives.
   - [Reachability — exploitability through the three consumers](#reachability--exploitability-through-the-three-consumers)
   - [Basis in published standards](#basis-in-published-standards)
   - [Governing rules](#governing-rules)
-- [**Findings**](#findings) — all 19, with severity, reachability and CWE
+- [**Findings**](#findings) — all 18, with severity, reachability and CWE
   - [Provenance and currency](#provenance-and-currency)
   - [A note on the shape of 000, 001 and 002](#a-note-on-the-shape-of-000-001-and-002)
 - [Applicability summary](#applicability-summary)
@@ -39,7 +39,8 @@ and sign/verify (encapsulate/decapsulate) paths are unmodified apart from import
 fork changes are additive APIs, added tests, or *stricter* validation. Upstream known-answer
 vectors are retained in full. They are treated as upstream-equivalent and are not re-analysed,
 except where a finding below explicitly concerns inherited behaviour — those are marked
-**upstream-inherited** and should be reported upstream rather than patched here.
+**upstream-inherited**, and each states whether upstream has since fixed it — in which case the
+action is to cherry-pick rather than to report.
 
 **Consumers.** Applicability was assessed against the three intended consumers, by tracing
 every call site into `sign/` and `kem/`:
@@ -47,6 +48,13 @@ every call site into `sign/` and `kem/`:
 - [`quantum-coin-go`](https://github.com/quantumcoinproject/quantum-coin-go) — the blockchain node
 - [`quantum-coin-js-sdk`](https://github.com/quantumcoinproject/quantum-coin-js-sdk) — the WASM/JavaScript SDK
 - [`quantumcoin.js`](https://github.com/quantumcoinproject/quantumcoin.js) — the ethers-style wrapper over the SDK
+- [`quantum-coin-wallet-desktop`](https://github.com/quantumcoinproject/quantum-coin-wallet-desktop) — the Electron desktop wallet; an **indirect** consumer, reaching the library through `quantumcoin.js` (`quantumcoin ^8.0.3`)
+
+The desktop wallet is included because it exercises paths the SDKs merely expose. In particular
+it offers **restore-from-seed and restore-from-seed-words**, so a base seed can originate from a
+user rather than from a CSPRNG — which is what makes FINDING-000 reachable. Where a finding's
+reachability through the desktop wallet is identical to `quantumcoin.js`, it is not called out
+separately.
 
 The two JavaScript packages are **QuantumCoin-specific SDKs, not general-purpose cryptographic
 libraries**. Their threat model is bounded accordingly; using the embedded circl WASM as a
@@ -111,7 +119,7 @@ product. The `not_affected` justification codes map onto findings here:
 | VEX justification | Findings |
 |---|---|
 | `vulnerable_code_not_in_execute_path` | 005, 014, 015, 016 — the API is never called by any consumer |
-| `vulnerable_code_cannot_be_controlled_by_adversary` | 000, 004 — seeds and readers are CSPRNG-only |
+| `vulnerable_code_cannot_be_controlled_by_adversary` | 004 — signing randomness is CSPRNG-only |
 | `inline_mitigations_already_exist` | 001, 002, 003 (keystore path), 013 — whole-key hashing, enforced message length, MAC-before-import, HKDF over the KEM secret |
 
 Findings marked *Reachable* or *Partially reachable* correspond to VEX `affected`.
@@ -147,7 +155,7 @@ appear to conflict, the formal statement governs.
 
 | ID | Title | Severity | Reachability | CWE | Tests |
 |:---|:---|:---|:---|:---|:---|
-| [000](./audit/FINDING-000-seed-expander-entropy.md) | Seed expander discards a third of its 96-byte input | Low | Not reachable | [CWE-1068] | yes |
+| [000](./audit/FINDING-000-seed-expander-entropy.md) | Seed expander discards a third of its 96-byte input | Medium | Reachable | [CWE-1068] | yes |
 | [001](./audit/FINDING-001-key-substitution.md) | Composite public key not bound into component signed inputs | Medium | Not reachable | [CWE-347] | yes |
 | [002](./audit/FINDING-002-cross-mode-separation.md) | Signing mode not bound into every component's signed input | Medium | Not reachable | [CWE-345] | yes |
 | [003](#finding-003) | SLH-DSA private-key half not validated on import | Medium | Partially reachable | [CWE-354] | no |
@@ -158,7 +166,6 @@ appear to conflict, the formal statement governs.
 | [008](#finding-008) | Compact mode is a 2-of-3 hybrid; no SLH-DSA signature is verified | Medium | Reachable (by design) | [CWE-757] | no |
 | [009](#finding-009) | `hybrideds` signs via non-FIPS internal entry points | Low | Reachable | [CWE-1240] | no |
 | [010](#finding-010) | Secret intermediates are not zeroized (`sign` and `kem`) | Low | n/a | [CWE-226] | no |
-| [011](#finding-011) | ML-DSA scheme OIDs deviate from the NIST CSOR arc | Informational | Not reachable | — | no |
 | [012](#finding-012) | Ed25519 verification does not reject small-order public keys | Informational | Not reachable | [CWE-1240] | no |
 | [013](#finding-013) | Hybrid KEM shared secret is a naked concatenation | Low | Not reachable | [CWE-325] | no |
 | [014](#finding-014) | Deterministic encapsulation permits seed-reuse correlation | Low | Not reachable | [CWE-323] | no |
@@ -175,13 +182,21 @@ This index consolidates three earlier review passes (two model families across c
 implementation-safety / offensive lenses) with the work recorded here. Every absorbed finding
 was **re-verified by execution against the current tree**, not carried over on trust.
 
-**Fixed findings are not listed.** Two items raised by the earlier passes were found already
-resolved during re-verification, and neither was ever reachable from any consumer, so both were
-removed rather than recorded — the code and its regression tests are the durable record.
+**Fixed findings are not listed.** Three items raised by the earlier passes are resolved — two
+were already fixed when re-verified, and one (the ML-DSA OIDs, below) was fixed during this pass
+by cherry-picking upstream. None was ever reachable from any consumer, so all were removed rather
+than recorded: the code and its tests are the durable record.
 
 Upstream CIRCL fixes `39afa0b` (slhdsa full reads, #634), `79a0516` (slhdsa prehash range,
-#647) and `651c11b` (ed25519 trailing data, #643) are also merged; FINDING-004's scope shrank
+#647) and `651c11b` (ed25519 trailing data, #643) are merged; FINDING-004's scope shrank
 accordingly, and three items previously flagged as *missing* upstream hardening are resolved.
+
+A fourth, `5cdb72f` "Correct OIDs for ML-DSA" (2025-08-11), was found missing during this pass
+and has since been cherry-picked — the ML-DSA scheme OIDs had omitted the `sigAlgs` arc,
+returning `2.16.840.1.101.3.4.17/18/19` instead of the registered
+`2.16.840.1.101.3.4.3.17/18/19` ([RFC 9882] §2). It is not listed as a finding because it is
+fixed. Divergence from upstream was re-checked against a local `cloudflare/circl` checkout at
+`df9fbea`; no other outstanding upstream correction was found in the audited packages.
 
 One earlier observation is deliberately **not** carried forward: comment-only nits in the Kyber
 field arithmetic, where the code was confirmed correct. That is a cosmetic item, not a finding.
@@ -207,7 +222,7 @@ both. They should be fixed together to avoid two consecutive wire-format breaks.
 
 ### FINDING-000 — Seed expander discards a third of its 96-byte input
 
-**Severity:** Low **Reachability:** Not reachable **CWE:** [CWE-1068]
+**Severity:** Medium **Reachability:** Reachable **CWE:** [CWE-1068]
 **Full write-up: [FINDING-000-seed-expander-entropy.md](./audit/FINDING-000-seed-expander-entropy.md)**
 
 `hybrideds.ExpandSeed` takes a 96-byte base seed but only 64 bytes reach the construction; the
@@ -228,13 +243,59 @@ draft algorithms [Dilithium2] and [SPHINCS+-SHAKE-256f-simple], not [FIPS 204] M
 via their `Internal` / `NoContext` entry points, which reproduce the pre-final wire format. This
 is also not a [CMVP]-validated module.
 
-Two further observations: the stated precondition ("a KDF with ≥ 256 bits of min-entropy") is
-**necessary but not sufficient**, because entropy in the discarded positions contributes exactly
-zero — the requirement is positional, not aggregate. And the derivation is **not injective**:
-`2^256` base seeds map to each key, so a base seed is not a unique wallet identifier.
+**The severity driver is non-injectivity, not the entropy accounting.** Because the seed-words
+mapping is exactly positional — word *k* encodes bytes `2k` and `2k+1` — and the absorbed bytes
+are the even indices below 64, **each of the first 32 words carries one absorbed byte and one
+discarded byte**. For any such word, 256 alternative words share its first byte, so
 
-**Not reachable** because all three consumers source base seeds from a CSPRNG, whose uniformity
-satisfies the positional requirement automatically.
+```
+256^32 = 2^256 distinct 48-word phrases open the identical wallet, silently.
+```
+
+These are not abstract preimages: they are phrases a user could write down. A seed phrase is
+routinely treated as an identity or credential rather than mere key material, and this breaks
+that: deduplication and "have I seen this seed" logic silently fails; proof-of-ownership and
+custody-dispute reasoning breaks, since a holder of phrase Y controls the wallet registered under
+phrase X with nothing able to distinguish them; and backup-verification tooling cannot detect that
+a recorded phrase differs from the original.
+
+The stated precondition ("a KDF with ≥ 256 bits of min-entropy") is also **necessary but not
+sufficient** — entropy in the discarded positions contributes exactly zero, so the requirement is
+positional, not aggregate.
+
+**Reachable — via restore-from-seed.** Newly generated wallets are safe: their base seeds come
+from a CSPRNG, whose uniformity satisfies the positional requirement automatically. But the
+**restore** path accepts a base seed the library did not generate. Traced end to end in the
+desktop wallet:
+
+```
+restore-from-seed / seed-words UI
+  → walletCreateNewWalletFromSeed(seedArray)      src/lib/wallet.ts
+  → IPC "WalletFromSeed"                          dist/electron/ipc/crypto.js
+  → quantumcoin.js  Wallet.fromSeed(seed)         src/wallet/wallet.js:631
+  → qcsdk.openWalletFromSeed(seed)                (96-byte seed ⇒ hybrideds)
+  → hybrideds.ExpandSeed                          ← a third of it is discarded
+```
+
+`Wallet.fromSeed` validates only that the seed is 64, 72 or 96 bytes. Nothing anywhere in the
+chain checks how that entropy is *distributed*, and the library's own documented contract does
+not require it to be. A seed originating from a legacy wallet, another implementation, or any
+generator unaware of the positional requirement can therefore reach `ExpandSeed` with materially
+less than 256 bits landing on the absorbed positions — degrading the Ed25519 and SPHINCS+ keys
+together, since both derive from that one branch.
+
+**Why Medium.** The entropy analysis and the injectivity analysis pull in different directions,
+so the boundaries are worth stating:
+
+- **Not High.** There is no attacker-*initiated* path. Deriving a colliding phrase requires the
+  absorbed bytes — i.e. the key — and an attacker who supplies a victim a seed already knows it.
+  Every generator in the ecosystem is a CSPRNG, so no deployed seed is degenerate.
+- **Not Low.** "Reduced margin" does not cover a 2^256-to-1 phrase→wallet map that no layer
+  surfaces. That silently voids seed-uniqueness assumptions in surrounding systems, which is the
+  Medium criterion.
+- **Medium + Reachable is coherent, not contradictory.** *Reachable* says a supported API accepts
+  the input; *Medium* says the consequence stops short of forgery or key recovery. This is the
+  clearest illustration in the audit of the two axes being genuinely independent.
 
 ---
 
@@ -470,39 +531,6 @@ spare such writes, though gc and gccgo retain them inside deferred closures in p
 
 ---
 
-<a id="finding-011"></a>
-### FINDING-011 — ML-DSA scheme OIDs deviate from the NIST CSOR arc
-
-**Severity:** Informational **Reachability:** Not reachable **CWE:** none applies
-**Upstream-inherited**
-
-`Scheme().Oid()` returns the following, confirmed in all three packages:
-
-| Scheme | Returned by `Scheme().Oid()` | Registered value |
-|---|---|---|
-| ML-DSA-44 (`sign/mldsa/mldsa44/dilithium.go:356`) | `2.16.840.1.101.3.4.17` | `2.16.840.1.101.3.4.3.17` |
-| ML-DSA-65 (`sign/mldsa/mldsa65/dilithium.go:289`) | `2.16.840.1.101.3.4.18` | `2.16.840.1.101.3.4.3.18` |
-| ML-DSA-87 (`sign/mldsa/mldsa87/dilithium.go:349`) | `2.16.840.1.101.3.4.19` | `2.16.840.1.101.3.4.3.19` |
-
-**Where the authoritative values live.** [FIPS 204] itself does **not** assign object
-identifiers — it specifies the algorithms only. OIDs for NIST algorithms are assigned by the
-[NIST Computer Security Objects Register (CSOR)][csor], under the `nistAlgorithms` arc
-`2.16.840.1.101.3.4`. Within it, `sigAlgs ::= { nistAlgorithms 3 }` is the signature-algorithm
-sub-arc, and ML-DSA is registered as `id-ml-dsa-44/65/87 ::= { sigAlgs 17/18/19 }`. The values
-shipped here omit that `3`, placing them directly under `nistAlgorithms` rather than under
-`sigAlgs`. The same registered values are used by the IETF LAMPS X.509 algorithm-identifier
-work for ML-DSA ([draft-ietf-lamps-dilithium-certificates][lamps-mldsa]).
-
-No effect on signature mathematics: the OID appears only in `Scheme().Oid()` and is never used in
-signing, verification or key encoding. Impact is confined to X.509 / ASN.1 interoperability,
-which no consumer exercises.
-
-Confirmed **upstream-inherited** — introduced by upstream commit `392a38c` ("Add OIDs to ML-DSA")
-authored by a Cloudflare CIRCL maintainer, not by this fork. It should be raised upstream rather
-than patched here, and the value confirmed against the CSOR registry before any change.
-
----
-
 <a id="finding-012"></a>
 ### FINDING-012 — Ed25519 verification does not reject small-order public keys
 
@@ -632,11 +660,12 @@ and stops being evidence the moment that consumer changes. The verdicts below we
 by tracing call sites at these exact commits:
 
 | Repository | Commit | Date | Worktree |
-|:---|:---|:---|:---|:---|
+|:---|:---|:---|:---|
 | `circl` (this repo) | `87e30cbaeeeb7be8199e72a279835d8d8481c5da` | 2026-08-01 | audit additions only |
 | `quantum-coin-go` | `8a060985b9badaf69f449ef06baaab4309a57dc2` | 2026-08-01 | clean |
 | `quantum-coin-js-sdk` | `b5ec38cb8fcd2dabea830eae236b9b98c934f6d6` | 2026-07-05 | clean |
 | `quantumcoin.js` | `b08a794117e04bca01ca608e6c4a78aa2f44da98` | 2026-07-19 | **14 uncommitted changes present** |
+| `quantum-coin-wallet-desktop` | `0e2724ee80eb0eec20e98228d8715717b4fcab60` | 2026-07-30 | clean |
 
 The `quantumcoin.js` assessment was made against the working tree at that commit, not the commit
 alone; its uncommitted changes were included in what was read. Re-confirm that verdict once they
@@ -646,29 +675,35 @@ Re-tracing is required whenever a consumer changes any of the invariants listed 
 below — in particular address derivation, message length, randomness sourcing, scheme-ID policy,
 or KEM shared-secret handling.
 
-| Finding | quantum-coin-go | quantum-coin-js-sdk | quantumcoin.js |
+| Finding | quantum-coin-go | quantum-coin-js-sdk | quantumcoin.js | wallet-desktop |
 |:---|:---|:---|:---|:---|
-| 000 — seed expander entropy | Not affected¹ | Not affected¹ | Not affected¹ |
-| 001 — key substitution | Not affected² | Not affected² | Not affected² |
-| 002 — cross-mode separation | Not affected³ | Not affected³ | Not affected³ |
-| 003 — SLH-DSA half unvalidated | Reachable via raw-key import⁴ | Reachable via raw-key import⁴ | Reachable via SDK sign paths⁴ |
-| 004 — compact ML-DSA short read | Not reachable⁵ | Not reachable⁵ | Not reachable⁵ |
-| 005 — nil reader panic | Not reachable⁵ | Not reachable⁵ | Not reachable⁵ |
-| 006 — missing KATs | Migration risk | Migration risk | Migration risk |
-| 007 — length collision | No current impact | No current impact | No current impact |
-| 008 — compact is 2-of-3 | Reachable by design⁶ | Reachable by design⁶ | Reachable by design⁶ |
-| 009 — non-FIPS entry points | Reachable (schemes 1–2) | Reachable (schemes 1–2) | Via SDK only |
-| 010 — no zeroization | Defence-in-depth | Defence-in-depth | Defence-in-depth |
-| 011 — ML-DSA OIDs | Not reachable (no ASN.1 use) | Not reachable | Not reachable |
-| 012 — Ed25519 small-order | Not reachable (hybrid combiner) | Not reachable | Not reachable |
-| 013 — KEM naked concatenation | Not reachable (RLPx HKDF)⁷ | n/a (no KEM use) | n/a |
-| 014 — deterministic encapsulation | Not reachable (unused API) | n/a | n/a |
-| 015 — KEM key import | Not reachable (ephemeral keys) | n/a | n/a |
-| 016 — panic-based KEM APIs | Not reachable (`Scheme()` iface) | n/a | n/a |
-| 017 — distinguishable KEM failures | Not reachable (uniform handling) | n/a | n/a |
-| 018 — KEM unmarshal cost | Partially reachable (RLPx) | n/a | n/a |
+| 000 — seed expander entropy | Not affected¹ | Reachable via seed import¹ | Reachable via seed import¹ | **Reachable — restore-from-seed**¹ |
+| 001 — key substitution | Not affected² | Not affected² | Not affected² | Not affected² |
+| 002 — cross-mode separation | Not affected³ | Not affected³ | Not affected³ | Not affected³ |
+| 003 — SLH-DSA half unvalidated | Reachable via raw-key import⁴ | Reachable via raw-key import⁴ | Reachable via SDK sign paths⁴ | Reachable via SDK sign paths⁴ |
+| 004 — compact ML-DSA short read | Not reachable⁵ | Not reachable⁵ | Not reachable⁵ | Not reachable⁵ |
+| 005 — nil reader panic | Not reachable⁵ | Not reachable⁵ | Not reachable⁵ | Not reachable⁵ |
+| 006 — missing KATs | Migration risk | Migration risk | Migration risk | Migration risk |
+| 007 — length collision | No current impact | No current impact | No current impact | No current impact |
+| 008 — compact is 2-of-3 | Reachable by design⁶ | Reachable by design⁶ | Reachable by design⁶ | Reachable by design⁶ |
+| 009 — non-FIPS entry points | Reachable (schemes 1–2) | Reachable (schemes 1–2) | Via SDK only | Via SDK only |
+| 010 — no zeroization | Defence-in-depth | Defence-in-depth | Defence-in-depth | Defence-in-depth |
+| 012 — Ed25519 small-order | Not reachable (hybrid combiner) | Not reachable | Not reachable | Not reachable |
+| 013 — KEM naked concatenation | Not reachable (RLPx HKDF)⁷ | n/a (no KEM use) | n/a | n/a |
+| 014 — deterministic encapsulation | Not reachable (unused API) | n/a | n/a | n/a |
+| 015 — KEM key import | Not reachable (ephemeral keys) | n/a | n/a | n/a |
+| 016 — panic-based KEM APIs | Not reachable (`Scheme()` iface) | n/a | n/a | n/a |
+| 017 — distinguishable KEM failures | Not reachable (uniform handling) | n/a | n/a | n/a |
+| 018 — KEM unmarshal cost | Partially reachable (RLPx) | n/a | n/a | n/a |
 
-¹ All base seeds come from a CSPRNG; uniform output satisfies the positional entropy requirement.
+¹ **Split verdict.** Seeds the library *generates* come from a CSPRNG, whose uniformity satisfies
+the positional requirement automatically — so newly created wallets are unaffected, and
+`quantum-coin-go` (which has no restore-from-user-seed path into `hybrideds`) is unaffected
+entirely. But `openWalletFromSeed` / `Wallet.fromSeed` accept a caller-supplied 96-byte seed and
+validate only its length, and the desktop wallet exposes that as restore-from-seed and
+restore-from-seed-words. A seed from a legacy wallet, another implementation, or any generator
+unaware of the positional requirement can therefore reach `ExpandSeed` with less than 256 bits on
+the absorbed positions.
 ² All three derive every identity from a hash of the **complete** composite public key.
 ³ Every message is a 32-byte digest, enforced by the library; no consumer invokes `hybrideds`
 full-mode signing.
@@ -684,7 +719,8 @@ outstanding hardening is per-account pinning.
 Each "not reachable" verdict depends on a property of the **callers**, not of the library. None
 is currently checked or stated in `sign/` or `kem/`:
 
-1. Base seeds are uniformly random across every byte position (000).
+1. Base seeds are uniformly random across every byte position (000) — **holds for wallets the
+   library generates, but NOT guaranteed on the restore-from-seed path**; see FINDING-000.
 2. Identity is derived from a hash of the complete composite public key, never a component or
    prefix (001).
 3. Messages are always exactly 32 bytes, and `CRYPTO_MSG_LENGTH` ≠ the compact digest length (002).
@@ -734,13 +770,13 @@ phrase would derive a different wallet.
 
 | | |
 |:---|:---|
-| Open findings | 19 |
+| Open findings | 18 |
 | Highest severity | Medium |
 | Requiring emergency action | 0 |
 | Enabling forgery, key recovery or fund loss in any consumer | 0 |
-| Reachable in consumers | 3 — FINDING-003 (partial), 008 (by design), 009 |
+| Reachable in consumers | 4 — FINDING-000 (restore-from-seed), 003 (partial), 008 (by design), 009 |
 | Partially fixed upstream | 1 — FINDING-004 |
-| Verified fixed and removed from this index | 2 — neither ever reachable from any consumer |
+| Verified fixed and removed from this index | 3 — none ever reachable from any consumer |
 
 ## Standards referenced
 
@@ -752,7 +788,8 @@ finalized FIPS algorithms. Both sets are listed because the audit spans them.
 - [PQC call for proposals][pqc-categories] — *Submission Requirements and Evaluation Criteria for the Post-Quantum Cryptography Standardization Process*, December 2016; §4.A.5 defines security categories 1–5.
 - [FIPS 203] — *Module-Lattice-Based Key-Encapsulation Mechanism Standard* (ML-KEM), August 2024.
 - [FIPS 204] — *Module-Lattice-Based Digital Signature Standard* (ML-DSA), August 2024 — schemes 3–5. Note it assigns no object identifiers.
-- [NIST CSOR][csor] — Computer Security Objects Register, algorithm registration; the authoritative source for NIST algorithm OIDs (see FINDING-011).
+- [NIST CSOR][csor] — Computer Security Objects Register, algorithm registration; the authoritative source for NIST algorithm OIDs. The Digital Signature Algorithms section is a JavaScript accordion with no anchor, so cite RFC 9882 §2 for a stable link.
+- [RFC 9882] — *Use of the ML-DSA Signature Algorithm in the Cryptographic Message Syntax (CMS)*, Standards Track, October 2025; §2 reproduces the CSOR ML-DSA OID assignments verbatim.
 - [draft-ietf-lamps-dilithium-certificates][lamps-mldsa] — IETF LAMPS X.509 algorithm identifiers for ML-DSA.
 - [FIPS 205] — *Stateless Hash-Based Digital Signature Standard* (SLH-DSA), August 2024 — schemes 3–5.
 - [FIPS 202] — *SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions*, August 2015 — SHAKE256.
@@ -816,3 +853,6 @@ finalized FIPS algorithms. Both sets are listed because the audit spans them.
 [CWE-1240]: https://cwe.mitre.org/data/definitions/1240.html
 [csor]: https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration
 [lamps-mldsa]: https://datatracker.ietf.org/doc/draft-ietf-lamps-dilithium-certificates/
+[RFC 9882]: https://www.rfc-editor.org/rfc/rfc9882.html#section-2
+[lamps-asn]: https://github.com/lamps-wg/dilithium-certificates/blob/main/X509-ML-DSA-2025.asn
+[RFC 8410]: https://www.rfc-editor.org/rfc/rfc8410.html#section-3

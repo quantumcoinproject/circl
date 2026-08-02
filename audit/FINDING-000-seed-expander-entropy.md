@@ -6,11 +6,11 @@
 | **Affects** | `sign/hybrideds/seed_expander.go` (`ExpandSeed`) |
 | **Class** | Entropy accounting; under-specified precondition; non-injective key derivation |
 | **CWE** | [CWE-1068] (Inconsistency Between Implementation and Documented Design). [CWE-331] (Insufficient Entropy) is the failure mode *if* the positional precondition is violated — not the current state. |
-| **Severity** | **Low** — reduced margin, no path to forgery or key recovery under any examined configuration. Rated per the scale in [SECURITY_AUDIT.md](../SECURITY_AUDIT.md#methodology). |
-| **Reachability** | **Not reachable** — all three consumers source base seeds from a CSPRNG. |
+| **Severity** | **Medium** — the seed-phrase → wallet map is 2²⁵⁶-to-1 and silently so, voiding seed-uniqueness assumptions. Rated per the scale in [SECURITY_AUDIT.md](../SECURITY_AUDIT.md#methodology); see [note on the rating](#note-on-the-severity-rating). |
+| **Reachability** | **Reachable** — via restore-from-seed, which accepts a base seed the library did not generate. Wallets the library generates are unaffected. |
 | **Security-strength assessment** | **Requirement met, with no headroom above it.** Each component receives seed min-entropy ≥ its target security strength, per [SP 800-133r2] §5.1 and the security-strength definition in [SP 800-57 Pt.1 r5] §5.6.1. See [Standards assessment](#standards-assessment). |
 | **Formal conformance claim** | **None made, and none available.** This scheme realizes the *pre-final draft* algorithms [Dilithium2] and [SPHINCS+-SHAKE-256f-simple], which predate [FIPS 204] and [FIPS 205]; there is no FIPS key-generation conformance to claim, and this is not a [CMVP]-validated module. |
-| **Impact on current consumers** | **None.** All supply CSPRNG output. See [Applicability](#applicability). |
+| **Impact on current consumers** | **Split.** None for wallets the library generates (CSPRNG seeds); reachable on the restore-from-seed path exposed by `quantum-coin-wallet-desktop` via `quantumcoin.js`. See [Applicability](#applicability). |
 | **Reproduction** | `sign/hybrideds/seedentropy_test.go` |
 
 Sibling schemes `sign/hybridedmldsaslhdsa` and `sign/hybridedmldsaslhdsa5` are **not**
@@ -50,14 +50,20 @@ reach the construction**. The 32 bytes at odd indices below 64 are copied nowher
 nowhere; they are discarded.
 
 The behaviour is deliberate, documented in the source, and retained for backward compatibility
-with deployed wallets. It is recorded here for three reasons: the resulting entropy budget
-leaves the strongest component sitting *exactly on* its required security strength, with no
-headroom above it; the stated precondition on the caller is **necessary but not sufficient**;
-and the derivation is **not injective**, which has consequences for tooling that treats a base
-seed as a wallet identifier.
+with deployed wallets.
 
-**This is not a break.** Under the uniformly random base seed that every consumer actually
-supplies, every component receives seed entropy at or above its target security strength.
+**The reason this is rated Medium is not the entropy budget — it is non-injectivity.** Ignoring a
+third of the input makes the derivation many-to-one: because the seed-words mapping is exactly
+positional, **2²⁵⁶ distinct 48-word phrases open any given wallet**, and nothing in the stack can
+distinguish them. That silently invalidates every assumption that a seed phrase identifies a
+wallet. See [Non-injectivity](#non-injectivity--the-severity-driver).
+
+The entropy picture is the *supporting* context, and it is reassuring rather than alarming: under
+a uniformly random base seed — which is what every generator in the ecosystem produces — each
+component still receives seed entropy at or above its target security strength. Two secondary
+observations follow from the same cause: the strongest component sits *exactly on* its required
+strength with no headroom, and the stated precondition on the caller is **necessary but not
+sufficient**, since entropy in the discarded positions contributes nothing.
 
 > **Read "no headroom" carefully.** It does *not* mean the keys have little or no entropy. Each
 > component receives at least the full entropy its parameter set requires — 256 bits where 256
@@ -65,6 +71,28 @@ supplies, every component receives seed entropy at or above its target security 
 > lands **exactly on** its requirement rather than above it, so it has no surplus to absorb a
 > future reduction in seed quality. The other two components retain roughly 128 bits of surplus
 > each.
+
+## Note on the severity rating
+
+Rated **Medium**. The boundaries are worth stating explicitly, because the entropy analysis and
+the injectivity analysis pull in different directions and it is easy to land on the wrong level
+by weighing only one of them.
+
+**Why not High.** There is no attacker-*initiated* path. Constructing a colliding phrase requires
+the absorbed bytes — that is, the key — and an attacker who hands a victim a seed to import
+already knows it, so the discarding yields them nothing they did not have. Every generator in the
+ecosystem is a CSPRNG (see [Applicability](#applicability)), so no deployed seed is degenerate,
+and a user who invents a weak phrase would have a weak wallet under *any* expander.
+
+**Why not Low.** "Reduced margin" is the Low criterion, and it fairly describes the entropy
+picture — the requirement is met for every seed that exists. But it does not describe a
+**2²⁵⁶-to-1 phrase → wallet map that no layer surfaces**. That silently voids seed-uniqueness
+assumptions in the systems built around this library, which is the Medium criterion.
+
+**Medium + Reachable is coherent.** *Reachable* is a statement about the API surface: restore
+accepts an unvalidated caller-supplied seed. *Medium* is a statement about consequence: it stops
+short of forgery or key recovery. The two axes are independent by design, and this finding is the
+clearest illustration of it in the audit.
 
 ## Structure
 
@@ -189,23 +217,53 @@ The correct precondition is positional:
 No caller is known to violate this, because all of them use a CSPRNG. The defect is that the
 contract as written would permit one to.
 
-## Non-injectivity
+## Non-injectivity — the severity driver
 
-Because 32 input bytes are ignored, `ExpandSeed` is not injective: each expanded seed has
-`2^256` base-seed preimages. `TestExpandSeedIsNotInjective` confirms that two base seeds
-differing in all 32 discarded positions produce byte-identical expanded seeds and hence a
-byte-identical composite public key — the same wallet, the same funds, two distinct backups.
+Because 32 input bytes are ignored, `ExpandSeed` is not injective: each expanded seed has `2^256`
+base-seed preimages. `TestExpandSeedIsNotInjective` and `TestExpandSeedPhraseLevelCollision`
+confirm that two base seeds differing in the discarded positions produce byte-identical expanded
+seeds and hence a byte-identical composite public key — the same wallet, the same funds, two
+distinct backups.
 
-This is harmless for key secrecy but has concrete consequences for surrounding tooling:
+### What this means at the seed-phrase level
 
-- A base seed is **not** a unique wallet identifier. De-duplication, indexing, or
-  "have I seen this seed before" logic keyed on base-seed bytes will treat colliding seeds as
-  distinct while they control identical funds.
-- Seed-phrase backups encode the full 96 bytes, so a third of every recorded phrase is inert.
-  Corruption confined to those positions is undetectable and — conveniently — harmless, but
-  round-tripping seed → key → seed cannot recover the original bytes.
-- Any future integrity check over the base seed must not assume the key commits to all 96
-  bytes, because it does not.
+Stated only in bytes, "2^256 preimages" sounds abstract. It is not. The seed-words mapping is a
+straight positional base-65536 substitution — word *k* encodes exactly `seedArray[2k]` and
+`seedArray[2k+1]`, with a 65,536-word list and no checksum. Since the absorbed bytes are the
+**even** indices below 64 and the discarded bytes the **odd** ones:
+
+> **Each of the first 32 words carries one absorbed byte and one discarded byte.**
+
+For any of those words, the 256 alternatives sharing its first byte leave the derived key
+unchanged. Across 32 words:
+
+```
+256^32 = 2^256 distinct 48-word phrases open the identical wallet.
+```
+
+The remaining 16 words (bytes 64–95, the Dilithium2 pass-through) are fully significant. So the
+collisions are not a degenerate corner: for *any* valid phrase there are 2^256 siblings, each a
+plausible-looking 48-word list a user could write down, all opening the same wallet, with nothing
+in the stack able to distinguish them.
+
+### Consequences
+
+Key secrecy is unaffected — a colliding phrase cannot be *found* without the absorbed bytes,
+i.e. the key. What breaks is every assumption that a seed phrase identifies a wallet:
+
+- **Seed phrase is not an identifier.** De-duplication, indexing, or "have I seen this seed
+  before" logic keyed on the seed will treat colliding phrases as distinct while they control
+  identical funds.
+- **Proof-of-ownership and custody disputes break.** A holder of phrase Y controls the wallet
+  registered under phrase X, and no layer can tell the two apart or establish which was original.
+- **Backup verification is weaker than it appears.** A recorded phrase that differs from the
+  original in any discarded position still opens the wallet, so a verification step cannot detect
+  the discrepancy. Round-tripping seed → key → seed cannot recover the original bytes.
+- Any future integrity check over the base seed must not assume the key commits to all 96 bytes,
+  because it does not.
+
+This is what places the finding at Medium rather than Low; see
+[Note on the severity rating](#note-on-the-severity-rating).
 
 ## Branch coupling
 
@@ -224,9 +282,12 @@ a structural break in SHAKE256 cannot affect the lattice component at all.
 
 ## Applicability
 
-**No exploitable path exists in `quantum-coin-go`, `quantum-coin-js-sdk`, or `quantumcoin.js`,
-and no operational action is required.** Every base seed in all three originates from a
-CSPRNG:
+The verdict splits on **who produced the base seed**.
+
+### Generation — not affected
+
+Every base seed the library itself generates comes from a CSPRNG, and uniform output satisfies
+the positional precondition automatically:
 
 - `quantum-coin-js-sdk` — `newWalletSeedWords` obtains the base seed from
   `circl.cryptoRandom(baseSeedLen)`, which wraps Go's `crypto/rand` (host
@@ -235,9 +296,49 @@ CSPRNG:
   only ever called with it, and checks the byte count before proceeding.
 - `quantumcoin.js` — performs no key derivation of its own; `Wallet.createRandom` routes to
   the SDK path above.
+- `quantum-coin-wallet-desktop` — the live create path is `showNewSeedScreen` →
+  `cryptoNewSeed(64|72)`, backed by Node `crypto.randomBytes` in the main process
+  (`electron/ipc/crypto.ts`). Note `walletCreateNewWallet()` in `src/lib/wallet.ts` calls
+  `cryptoNewSeed()` with no argument, defaulting to 96 bytes — but it is **dead code**, with no
+  call sites under `src/**` or `electron/**`.
 
-Uniform output satisfies the positional precondition automatically, so the XOF branch receives
-its full 256 bits and every component meets its target strength.
+**The desktop wallet can no longer create 96-byte `hybrideds` wallets at all.** Its create flow
+offers 64 or 72 bytes only; 96 appears solely on the restore branch. New wallets therefore use
+the corrected sibling expanders, which absorb the whole base seed and are not affected by this
+finding. This materially narrows the scope: FINDING-000 concerns **legacy wallets being
+restored**, not anything newly created.
+
+`quantum-coin-go` is unaffected entirely: it has no path that feeds a user-supplied seed into
+`hybrideds`.
+
+### Restore — reachable
+
+The **restore** path accepts a base seed the library did not generate and does not inspect.
+Traced end to end:
+
+```
+restore-from-seed / seed-words UI                     quantum-coin-wallet-desktop
+  → walletCreateNewWalletFromSeed(seedArray)          src/lib/wallet.ts:104
+  → IPC "WalletFromSeed"                              dist/electron/ipc/crypto.js:71
+  → Wallet.fromSeed(seed)                             quantumcoin.js src/wallet/wallet.js:631
+  → qcsdk.openWalletFromSeed(seed)                    (96 bytes ⇒ hybrideds)
+  → hybrideds.ExpandSeed                              ← a third of it is discarded
+```
+
+`Wallet.fromSeed` asserts only that the seed is 64, 72 or 96 bytes long. Seed words are converted
+back to bytes by `SeedWordsGetSeedArray` with no entropy assessment. **Nothing in the chain checks
+how the entropy is distributed** — and the library's own documented contract does not require
+callers to, since it asks only for aggregate min-entropy.
+
+A base seed originating from a legacy wallet, a different implementation, or any generator
+unaware of the positional requirement can therefore reach `ExpandSeed` with materially less than
+256 bits on the absorbed positions. Because the XOF branch feeds **both** Ed25519 and all
+SPHINCS+ material, a shortfall there degrades two of the three components together, leaving only
+Dilithium2 (PQC category 2) at full strength.
+
+Exploitation is conditional: an ordinary seed phrase produced by a QuantumCoin wallet carries
+full entropy in every position and is unaffected. The exposure is to seeds whose entropy is
+*positionally* degenerate, which the contract permits and nothing rejects.
 
 **Residual exposure is confined to future work**, specifically: introducing a mnemonic or
 KDF-based base seed that is not uniform across byte positions; reducing base-seed size;
@@ -246,25 +347,40 @@ or building tooling that assumes base seeds are unique per wallet.
 ## Recommended actions
 
 This expander is **frozen**: changing it would derive different wallets from every existing
-seed phrase. The recommendations are therefore documentation and guard-rail changes, not
-construction changes.
+seed phrase. The construction cannot be repaired without breaking every deployed wallet, so the
+remediation is to constrain what reaches it and to state the requirement honestly.
 
-1. **Correct the precondition in the doc comment** to the positional form given above. This is
-   the substantive fix and costs nothing.
-2. **Record the zero-margin property** next to `AbsorbSize`, noting that
+**Documenting non-injectivity is the item that matters most**, because it is the assumption
+integrators will otherwise build on without knowing. The entropy checks come second — they guard
+a case no current generator produces.
+
+1. **State non-injectivity in the exported API documentation** of `ExpandSeed`,
+   `openWalletFromSeed` and `Wallet.fromSeed`: a seed phrase does **not** uniquely identify a
+   wallet, and 2²⁵⁶ distinct phrases open any given one. Any consumer using a seed as a key for
+   deduplication, indexing, proof-of-ownership or backup verification is relying on a property
+   that does not hold. This costs nothing and prevents the most likely misuse.
+2. **Reject or warn on restored seeds with degenerate positional entropy.** The natural place is
+   the boundary that already validates seed length — `Wallet.fromSeed` in `quantumcoin.js`, or
+   `openWalletFromSeed` in the SDK. A cheap and effective check is to reject a 96-byte seed whose
+   32 absorbed bytes (even indices below 64) are all-zero, constant, or of obviously low
+   variability. This cannot make a weak seed strong, but it converts a silent key weakening into
+   a visible refusal. Note this is a *caller-side* mitigation: the library cannot enforce it
+   without breaking the frozen derivation.
+3. **Correct the precondition in the doc comment** to the positional form given above, so that
+   callers implementing (1) know what they must actually guarantee. The current wording asks only
+   for aggregate min-entropy, which is what makes an unsafe restore look contract-compliant.
+4. **Record the no-headroom property** next to `AbsorbSize`, noting that
    SPHINCS+-SHAKE-256f-simple receives exactly its target 256 bits and that the constant is
    therefore a security parameter, not an implementation detail.
-3. **State non-injectivity in the exported documentation**, so downstream tooling does not
-   assume base seeds uniquely identify wallets.
-4. **Correct the component names** in the package documentation. `hybrideds` realizes
+5. **Correct the component names** in the package documentation. `hybrideds` realizes
    Dilithium2 and SPHINCS+-SHAKE-256f-simple, not ML-DSA-44 and SLH-DSA-SHAKE-256f; the Go
    identifiers invite the opposite reading and an auditor cross-checking against [FIPS 204] or
    [FIPS 205] test vectors would get a false mismatch.
-5. **Do not extend this expander to new schemes.** The sibling packages already use the
+6. **Do not extend this expander to new schemes.** The sibling packages already use the
    corrected design — full absorption of the base seed under an ASCII domain string
    (`"hybrid-ed-ml44-slhshake256f-64-160-v1"` and the level-5 equivalent) — which should
    remain the template.
-6. If a base seed is ever sourced from anything other than a CSPRNG, **validate the
+7. If a base seed is ever sourced from anything other than a CSPRNG, **validate the
    positional entropy assumption first**; the aggregate figure is not sufficient.
 
 ## References

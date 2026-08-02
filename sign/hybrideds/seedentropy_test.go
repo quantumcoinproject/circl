@@ -25,11 +25,21 @@ package hybrideds
 // and receives exactly 256 bits), and because the precondition that actually
 // matters is per-position, not aggregate.
 //
-// NO IMPACT ON THE INTENDED CONSUMERS -- no action required. quantum-coin-go,
-// quantum-coin-js-sdk and quantumcoin.js all source base seeds from a CSPRNG
-// (crypto/rand, or circl.cryptoRandom which wraps it), which is uniform and
-// therefore satisfies the per-position requirement. Planned documentation and
-// hardening item, not an incident.
+// CONSUMER IMPACT IS SPLIT. Wallets the library GENERATES are unaffected:
+// quantum-coin-go, quantum-coin-js-sdk, quantumcoin.js and the desktop wallet
+// all draw new base seeds from a CSPRNG (crypto/rand, or circl.cryptoRandom
+// which wraps it), and uniform output satisfies the per-position requirement.
+//
+// The RESTORE path is reachable. Wallet.fromSeed / openWalletFromSeed accept a
+// caller-supplied 96-byte base seed and validate only its length, and
+// quantum-coin-wallet-desktop exposes that as restore-from-seed and
+// restore-from-seed-words (96 bytes is restore-only there; new wallets are 64 or
+// 72 bytes and use the corrected sibling expanders).
+//
+// FINDING-000 is rated Medium / Reachable. The driver is NOT that the entropy
+// requirement fails -- it is met for every seed that exists -- but that the
+// seed-phrase -> wallet map is not injective: 2^256 distinct 48-word phrases open
+// any given wallet, silently. See TestExpandSeedPhraseLevelCollision below.
 //
 // These are CHARACTERIZATION tests asserting today's behaviour, and TRIPWIRES:
 // this expander is frozen for wallet backward compatibility, so a failure here
@@ -161,6 +171,87 @@ func TestExpandSeedIsNotInjective(t *testing.T) {
 	if !bytes.Equal(rawA, rawB) {
 		t.Error("colliding seeds produced different public keys")
 	}
+}
+
+// TestExpandSeedPhraseLevelCollision expresses the non-injectivity at the level
+// users actually experience: two different SEED PHRASES opening one wallet.
+//
+// The seed-words layer is a straight positional base-65536 substitution -- word k
+// encodes exactly seedArray[2k] and seedArray[2k+1], from a 65,536-word list,
+// with no checksum. Because the absorbed bytes are the EVEN indices below 64 and
+// the discarded bytes the ODD ones:
+//
+//	each of the first 32 words carries one absorbed byte and one discarded byte.
+//
+// So for any of those 32 words there are 256 alternative words that leave the
+// derived key unchanged -- the ones sharing its first byte. Across 32 words:
+//
+//	256^32 = 2^256 distinct 48-word phrases open the identical wallet.
+//
+// This test models one such sibling pair by varying only the second byte of each
+// of the first 32 word-slots, which is exactly what substituting those words
+// would do. It asserts both phrases yield the same address.
+//
+// This is the observation that sets FINDING-000's severity: key secrecy is
+// intact (a colliding phrase cannot be found without the absorbed bytes, i.e.
+// the key), but any system treating a seed phrase as an identifier -- dedup,
+// proof-of-ownership, backup verification -- is silently wrong.
+func TestExpandSeedPhraseLevelCollision(t *testing.T) {
+	// Two "phrases": identical in every absorbed byte, differing in the second
+	// byte of all 32 word-slots that carry one.
+	phraseA := baseSeedPattern()
+	phraseB := baseSeedPattern()
+	for word := 0; word < AbsorbSize/2; word++ {
+		discarded := 2*word + 1 // the odd byte carried by this word
+		phraseB[discarded] = ^phraseA[discarded]
+	}
+
+	// They really are different phrases: 32 of the 48 words differ.
+	differingWords := 0
+	for word := 0; word < BaseSeedSize/2; word++ {
+		if phraseA[2*word] != phraseB[2*word] || phraseA[2*word+1] != phraseB[2*word+1] {
+			differingWords++
+		}
+	}
+	if differingWords != AbsorbSize/2 {
+		t.Fatalf("test setup: %d words differ, want %d", differingWords, AbsorbSize/2)
+	}
+
+	expA, err := ExpandSeed(phraseA)
+	if err != nil {
+		t.Fatalf("ExpandSeed(phraseA): %v", err)
+	}
+	expB, err := ExpandSeed(phraseB)
+	if err != nil {
+		t.Fatalf("ExpandSeed(phraseB): %v", err)
+	}
+
+	pubA, _, err := NewKeyFromSeed(&expA)
+	if err != nil {
+		t.Fatalf("NewKeyFromSeed(phraseA): %v", err)
+	}
+	pubB, _, err := NewKeyFromSeed(&expB)
+	if err != nil {
+		t.Fatalf("NewKeyFromSeed(phraseB): %v", err)
+	}
+	rawA, err := pubA.MarshalBinary()
+	if err != nil {
+		t.Fatalf("marshal phraseA public key: %v", err)
+	}
+	rawB, err := pubB.MarshalBinary()
+	if err != nil {
+		t.Fatalf("marshal phraseB public key: %v", err)
+	}
+
+	if !bytes.Equal(rawA, rawB) {
+		t.Fatal("phrases that differ in 32 of 48 words produced different wallets; " +
+			"ExpandSeed has become injective over the discarded positions. That is a " +
+			"WIRE-FORMAT CHANGE invalidating every deployed 48-word seed phrase -- see " +
+			"FINDING-000 before changing this")
+	}
+	t.Logf("FINDING-000 (expected): two phrases differing in %d of %d words derive the "+
+		"identical wallet; 256^%d = 2^%d such sibling phrases exist per wallet",
+		differingWords, BaseSeedSize/2, AbsorbSize/2, 8*(AbsorbSize/2))
 }
 
 // TestExpandSeedBranchIndependence documents the entropy split across the two
